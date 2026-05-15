@@ -18,6 +18,7 @@ from planara_engine.api.middleware import RequestContextMiddleware
 from planara_engine.api.routes_health import router as health_router
 from planara_engine.core.logging import configure_logging, get_logger
 from planara_engine.core.settings import Settings, get_settings
+from planara_engine.persistence.database import init_db
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -41,6 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             host=settings.host,
             port=settings.port,
         )
+        init_db()
         yield
         log.info("engine_stopping")
 

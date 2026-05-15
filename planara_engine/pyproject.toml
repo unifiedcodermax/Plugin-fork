@@ -54,6 +54,11 @@ asyncio_mode = "auto"
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:pydantic.*",
+    # Python 3.14 + sqlite3 finalizer interplay surfaces as an
+    # "unraisable" warning during Session/engine teardown even on a
+    # clean rollback. Harmless in tests; ignored here so we keep
+    # warnings-as-errors for everything else.
+    "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
 [tool.ruff]
