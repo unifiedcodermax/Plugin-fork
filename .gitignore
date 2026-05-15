@@ -1,0 +1,6 @@
+.DS_Store
+*.skp
+*.log
+tmp/
+dist/
+node_modules/
