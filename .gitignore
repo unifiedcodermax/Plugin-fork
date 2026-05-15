@@ -1,6 +1,50 @@
+# OS / editor
 .DS_Store
-*.skp
 *.log
+*.swp
+.idea/
+.vscode/
+
+# SketchUp work files
+*.skp
+
+# Build / runtime junk
 tmp/
 dist/
+build/
 node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# Virtual envs
+.venv/
+venv/
+env/
+.python-version
+
+# Env files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Local DB
+*.sqlite
+*.sqlite3
+*.db
+
+# Engine runtime artifacts
+planara_engine/.run/
+planara_engine/instance/
