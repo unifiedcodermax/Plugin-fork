@@ -1,0 +1,89 @@
+{
+  "Zones": {
+    "Standard": {
+      "FAR": {
+        "Base": 1.5,
+        "Max": 3.0,
+        "PremiumByRoadWidth": {
+          "30-40_ft": 0.20,
+          "40-60_ft": 0.40,
+          ">60_ft": 0.60
+        },
+        "PremiumChargePct": 28
+      },
+      "Setbacks": {
+        "Residential": {
+          "Plot<=6m": {"Front": 1.0, "Side": 1.0, "Rear": 0.0},
+          "6-9m": {"Front": 1.0, "Side": 1.0, "Rear": 1.0},
+          "9-12m": {"AllSides": 1.5}
+        },
+        "HighRise": [
+          {"HeightRange": "12-15m", "Setback": 5.0},
+          {"HeightRange": "15-18m", "Setback": 6.0},
+          {"HeightRange": "18-21m", "Setback": 7.0},
+          {"HeightRange": "21m+", "Setback": 8.0}
+        ]
+      },
+      "Height": {
+        "HabitableCeiling": 2.75,
+        "HeadroomUnderBeam": 2.4
+      },
+      "Parking": {
+        "Car": 18,
+        "Motorcycle": 2.5,
+        "Cycle": 1.5,
+        "VisitorPct": 10,
+        "StandardsByUse": {
+          "Retail": "1 car/50 sqm",
+          "Office": "1 car/50 sqm",
+          "Hotel": "1 car/4 rooms",
+          "Hospital": "1 car/4 beds",
+          "Theatre": "1 car/25 seats"
+        }
+      },
+      "EVCharging": {
+        "MinParkingPercent": 20,
+        "LoadFactor": 1.25,
+        "Standards": {
+          "Plotted": {"MinChargersPerHouse": 1},
+          "GroupHousing": {
+            "Trigger": {"FloorArea_sqm": 5000, "Load_kW": 250},
+            "MinChargers": 2
+          }
+        }
+      },
+      "FireSafety": {
+        "Required": true,
+        "CertificateBy": "State Fire Services",
+        "AdvancedSystemsAbove24m": true
+      },
+      "Lifts": {
+        "Residential": {"MinFloors": 4, "Capacity_persons": 8, "DoorWidth_m": 0.9},
+        "Commercial": {"MinFloors": 3, "Capacity_persons": 10, "FireLiftAbove24m": true}
+      },
+      "DataCentreExceptionAllowed": false
+    },
+    "CBD": {
+      "InheritsFrom": "Standard",
+      "Setbacks": {"Relaxed": true},
+      "Parking": {"OnStreet": false, "OnsiteMandatory": true},
+      "FAR": {"HigherAllowed": true}
+    },
+    "Heritage": {
+      "InheritsFrom": "Standard",
+      "Height": {"MaxAllowed": "Low", "NoHighRise": true},
+      "ArchitecturalControls": {"HarmonyRequired": true},
+      "Incentives": {"TDRAvailable": true}
+    }
+  },
+  "General": {
+    "DataCentreException": {
+      "Allowed": true,
+      "Conditions": {
+        "NoMezzanine": true,
+        "StructuralCertRequired": true,
+        "FireDeptNOC": true
+      }
+    }
+  }
+}
