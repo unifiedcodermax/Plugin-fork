@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+    font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f3f3f3;
+    color: #1f1f1f;
+    }
+    .dialog {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      max-width: 100%;
+    }
+    h3 {
+      font-weight: 600;
+      font-size: 16px;
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    td {
+      padding: 8px 0;
+      border-bottom: 1px solid #ddd;
+    }
+    td:first-child {
+      font-weight: 500;
+      color: #5a5a5a;
+      width: 40%;
+    }
+    td:last-child {
+      text-align: right;
+      font-weight: 600;
+      color: #333;
+    }
+  </style>
+  <title>Active Model details</title>
+</head>
+<body>
+   <div class="dialog">    
+   <!-- <h3>Model Input data</h3>
+    <table>
+       <tr><td>Plot Area in Sq mtr:</td><td> 
+         <textbox id="plotsize">          
+      </td></tr>
+      <tr><td>Location Classification:</td><td> 
+         <select id="locationClassification">
+          <option>CBD</option>
+          <option>Heritage</option>          
+          <option>HDZ</option>
+        </select>
+      </td></tr>
+      <tr><td>FSI controls :</td><td>
+        <select id="fsi-mode">
+            <option>Strict Enforce</option>
+            <option>Disable FSI restriction</option>
+            <option>Relax by %</option>
+          </select>
+      </td></tr>
+
+      <tr><td>Zone</td><td >
+        <select id="input-zone">
+          <option>Residential</option>
+          <option>Commercial</option>
+          <option>Industry</option>
+        </select>
+      </td></tr>      
+    </table>
+    
+    <button onclick="sendData()">Apply</button>
+  -->
+    <h3>Active Model stats</h3>
+    <table>
+      <tr><td>Location:</td><td id="location"></td></tr>
+      <tr><td>Location Classification:</td><td id="locClassification"></td></tr>
+      <tr><td>Zone:</td><td id="zone">-</td></tr>           
+      <tr><td>Plot Area:</td><td id="plot_area"></td></tr>     
+      <tr><td>Built Up Area:</td><td id="build_area"></td></tr>      
+      <tr><td>FSI:</td><td id="current_fsi"></td></tr>
+      <tr><td>Setback:</td><td id="setbacks"></td></tr>
+      <!--<tr><td>Geo Location: </td><td id="geo_data"></td></tr> -->
+    </table>
+   </div> 
+
+  <script>
+    function sendData() {
+     /* let data = {
+        fsi_mode: document.getElementById('fsi-mode').value,
+        locationClassification: document.getElementById('locationClassification').value,
+        zone: document.getElementById('input-zone').value
+      };
+      window.sketchup.update_settings(JSON.stringify(data));
+      */
+    }
+  </script>
+</body>
+</html>
