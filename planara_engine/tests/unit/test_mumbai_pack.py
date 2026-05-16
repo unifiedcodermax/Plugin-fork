@@ -18,7 +18,7 @@ from planara_engine.rules import applicable_rules
 from planara_engine.rules.loader import PACKS_DIR, get_pack, load_pack
 
 
-CURRENT_VERSION = "0.1.0"
+CURRENT_VERSION = "0.2.0"
 
 # Mumbai uses Island (south Mumbai) and Suburbs as classification —
 # DCPR 2034 has a meaningful FSI split between the two. Distinct
@@ -41,8 +41,8 @@ def test_pack_loads_clean() -> None:
     pack = load_pack("Mumbai")
     assert pack.city == "Mumbai"
     assert pack.version == CURRENT_VERSION
-    # 6 FSI + 6 setback + 3 coverage + 3 open_space + 3 parking = 21.
-    assert len(pack.rules) == 21
+    # 21 base + 2 overlays (CRZ fsi, airport height) = 23.
+    assert len(pack.rules) == 23
 
 
 def test_pack_ships_inside_package() -> None:
@@ -130,3 +130,65 @@ def test_bangalore_still_loads_independently() -> None:
     blr_ids = {r.id for r in bangalore.rules}
     mum_ids = {r.id for r in mumbai.rules}
     assert blr_ids.isdisjoint(mum_ids)
+
+
+# ---- overlay rules -----------------------------------------------------------
+
+
+def test_no_overlay_skips_overlay_rules() -> None:
+    """A plot with no overlays must not pick up CRZ or airport rules."""
+
+    pack = load_pack("Mumbai")
+    matched = applicable_rules(
+        pack, classification="Island", zone="Residential", overlays=[]
+    )
+    ids = {r.id for r in matched}
+    assert "mum.overlay.crz.fsi" not in ids
+    assert "mum.overlay.airport.height" not in ids
+
+
+def test_crz_overlay_adds_strict_fsi_rule() -> None:
+    """CRZ overlay adds a stricter FSI rule on top of the base.
+    Both fire together; the user sees whichever they violate."""
+
+    pack = load_pack("Mumbai")
+    matched = applicable_rules(
+        pack, classification="Island", zone="Residential", overlays=["crz"]
+    )
+    ids = [r.id for r in matched]
+    fsi_ids = [i for i in ids if "fsi" in i]
+    # Base FSI rule + CRZ overlay FSI rule, both with category="fsi".
+    assert "mum.fsi.island.residential" in fsi_ids
+    assert "mum.overlay.crz.fsi" in fsi_ids
+
+
+def test_airport_overlay_shared_with_bangalore() -> None:
+    """The 'airport' overlay key is reused across cities — proves
+    overlay names are NOT a global enum but a per-pack label. Both
+    packs fire their own airport rule when the overlay is active."""
+
+    mumbai = load_pack("Mumbai")
+    bangalore = load_pack("Bangalore")
+
+    m_matched = applicable_rules(
+        mumbai, classification="Island", zone="Commercial", overlays=["airport"]
+    )
+    b_matched = applicable_rules(
+        bangalore, classification="CBD", zone="Commercial", overlays=["airport"]
+    )
+    assert "mum.overlay.airport.height" in {r.id for r in m_matched}
+    assert "blr.overlay.airport.height" in {r.id for r in b_matched}
+
+
+def test_crz_overlay_is_mumbai_only() -> None:
+    """CRZ is Mumbai-specific. Bangalore doesn't define it — projects
+    that send overlays=['crz'] through Bangalore must silently match
+    nothing (per the unknown-overlay forward-compat contract)."""
+
+    bangalore = load_pack("Bangalore")
+    matched = applicable_rules(
+        bangalore, classification="CBD", zone="Residential", overlays=["crz"]
+    )
+    # Only the base rules fire; no CRZ rule in Bangalore.
+    for r in matched:
+        assert "crz" not in r.id
