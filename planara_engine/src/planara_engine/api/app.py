@@ -17,6 +17,11 @@ from planara_engine.api.errors import register_error_handlers
 from planara_engine.api.middleware import RequestContextMiddleware
 from planara_engine.api.routes_auth import router as auth_router
 from planara_engine.api.routes_health import router as health_router
+from planara_engine.api.routes_validate import router as validate_router
+
+# Side-effect import: registers every evaluator with the engine
+# registry. Must run before any route handler dispatches a rule.
+import planara_engine.compliance  # noqa: F401, E402
 from planara_engine.core.logging import configure_logging, get_logger
 from planara_engine.core.settings import Settings, get_settings
 from planara_engine.persistence.database import init_db
@@ -61,6 +66,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(validate_router)
 
     return app
 
