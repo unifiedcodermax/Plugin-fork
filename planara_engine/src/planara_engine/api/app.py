@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from planara_engine import __version__
 from planara_engine.api.errors import register_error_handlers
 from planara_engine.api.middleware import RequestContextMiddleware
+from planara_engine.api.routes_auth import router as auth_router
 from planara_engine.api.routes_health import router as health_router
 from planara_engine.core.logging import configure_logging, get_logger
 from planara_engine.core.settings import Settings, get_settings
@@ -59,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_error_handlers(app)
 
     app.include_router(health_router)
+    app.include_router(auth_router)
 
     return app
 
