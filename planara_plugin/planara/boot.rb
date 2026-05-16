@@ -17,6 +17,7 @@ require_relative 'logger'
 require_relative 'session'
 require_relative 'engine_client'
 require_relative 'engine_supervisor'
+require_relative 'geometry/extractor'
 require_relative 'ui/login_dialog'
 
 module Planara
@@ -47,15 +48,63 @@ module Planara
       end
     end
 
-    # Called once a valid JWT is stored in Session. Sprint 3 will
-    # take over this hook to attach observers and show the live
-    # results panel. For now it confirms the round-trip.
+    # Called once a valid JWT is stored in Session. Runs the first
+    # validation manually; observer-driven re-validation is wired
+    # in Sprint 4.
     def on_authenticated
       Logger.info('authenticated', token_length: Session.token&.length)
-      ::UI.messagebox(
-        "Signed in to Planara.\n\n" \
-        "Live validation and observers will arrive in Sprint 3."
+      run_validation_once
+    end
+
+    # Demo path until observers arrive: prompt for project metadata,
+    # extract a Snapshot, post /validate, render the response.
+    def run_validation_once
+      project = prompt_project_setup
+      return unless project
+
+      model = Sketchup.active_model
+      snapshot = Geometry::Extractor.extract(model: model, project: project)
+      Logger.info(
+        'snapshot_extracted',
+        floors: snapshot[:building][:floors].length,
+        plot_area_m2: snapshot[:plot][:area_m2]&.round(2)
       )
+
+      response = EngineClient.post('/validate', snapshot)
+      show_validation_result(response)
+    rescue Geometry::Extractor::ExtractionError => e
+      ::UI.messagebox("Could not read the model:\n\n#{e.message}\n\n" \
+                      'Name your plot group "Plot" and floor groups "Floor 0", "Floor 1", etc.')
+    rescue EngineClient::EngineError => e
+      ::UI.messagebox("Validation failed: #{e.message}")
+    end
+
+    def prompt_project_setup
+      prompts  = ['City', 'Classification (Heritage / CBD / HDZ)', 'Zone (Residential / Commercial / Industry)']
+      defaults = ['Bangalore', 'CBD', 'Residential']
+      input = ::UI.inputbox(prompts, defaults, 'Planara — Project setup')
+      return nil unless input
+
+      { city: input[0], classification: input[1], zone: input[2] }
+    end
+
+    def show_validation_result(response)
+      ok = response['ok']
+      violations = response['violations'] || []
+      metrics = response['metrics'] || {}
+
+      lines = []
+      lines << (ok ? 'PASS — design is compliant.' : "FAIL — #{violations.length} violation(s).")
+      lines << ''
+      violations.each do |v|
+        lines << "  • [#{v['severity']}] #{v['rule_id']}"
+        lines << "      #{v['message']}"
+      end
+      lines << ''
+      lines << "FSI: #{metrics['fsi']} (limit #{metrics['max_fsi']})" if metrics['fsi']
+      lines << "Rule pack: #{metrics['rule_pack_version']}" if metrics['rule_pack_version']
+
+      ::UI.messagebox(lines.join("\n"))
     end
 
     # Called when SketchUp shuts down. Registered in install_hooks
