@@ -20,6 +20,7 @@ require_relative 'engine_supervisor'
 require_relative 'geometry/extractor'
 require_relative 'observers/live_validator'
 require_relative 'ui/login_dialog'
+require_relative 'ui/results_dialog'
 
 module Planara
   module Boot
@@ -55,6 +56,7 @@ module Planara
     def on_authenticated
       Logger.info('authenticated', token_length: Session.token&.length)
       return unless ensure_project_setup
+      UI::ResultsDialog.show
       start_live_loop
       live_validate
     end
@@ -158,22 +160,7 @@ module Planara
     end
 
     def show_validation_result(response)
-      ok = response['ok']
-      violations = response['violations'] || []
-      metrics = response['metrics'] || {}
-
-      lines = []
-      lines << (ok ? 'PASS — design is compliant.' : "FAIL — #{violations.length} violation(s).")
-      lines << ''
-      violations.each do |v|
-        lines << "  • [#{v['severity']}] #{v['rule_id']}"
-        lines << "      #{v['message']}"
-      end
-      lines << ''
-      lines << "FSI: #{metrics['fsi']} (limit #{metrics['max_fsi']})" if metrics['fsi']
-      lines << "Rule pack: #{metrics['rule_pack_version']}" if metrics['rule_pack_version']
-
-      ::UI.messagebox(lines.join("\n"))
+      UI::ResultsDialog.update(response)
     end
 
     # Called when SketchUp shuts down. Registered in install_hooks
@@ -181,6 +168,7 @@ module Planara
     def shutdown
       Logger.info('plugin_shutting_down')
       stop_live_loop
+      UI::ResultsDialog.close
       EngineSupervisor.stop
       Session.clear
     end

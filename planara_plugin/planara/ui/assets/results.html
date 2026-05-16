@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Planara — Live compliance</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --fg: #1f2328;
+      --muted: #5e6471;
+      --border: #d0d7de;
+      --bg: #ffffff;
+      --row-bg: #f6f8fa;
+      --error-bg: #ffe9e9;
+      --error-fg: #a40e0e;
+      --warning-bg: #fff5d1;
+      --warning-fg: #7a5b00;
+      --ok-bg: #e7f7e8;
+      --ok-fg: #167314;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 16px 20px;
+      color: var(--fg);
+      background: var(--bg);
+      font-size: 13px;
+    }
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 4px 0;
+    }
+    .summary {
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin: 0 0 14px 0;
+      font-weight: 500;
+    }
+    .summary.ok { background: var(--ok-bg); color: var(--ok-fg); }
+    .summary.fail { background: var(--error-bg); color: var(--error-fg); }
+    .summary.empty { background: var(--row-bg); color: var(--muted); font-weight: 400; }
+    .meta {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .meta span { white-space: nowrap; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      text-align: left;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th { font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 10px; }
+    tr.error td.severity { color: var(--error-fg); font-weight: 600; }
+    tr.warning td.severity { color: var(--warning-fg); font-weight: 600; }
+    .pill {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .pill.error { background: var(--error-bg); color: var(--error-fg); }
+    .pill.warning { background: var(--warning-bg); color: var(--warning-fg); }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>Live compliance</h1>
+  <div id="meta" class="meta"></div>
+  <div id="summary" class="summary empty">Waiting for first validation…</div>
+  <table id="violations-table" style="display:none">
+    <thead>
+      <tr>
+        <th style="width:80px">Severity</th>
+        <th style="width:32%">Rule</th>
+        <th>Message</th>
+      </tr>
+    </thead>
+    <tbody id="violations-body"></tbody>
+  </table>
+
+  <script>
+    window.Planara = window.Planara || {};
+
+    function fmtMeta(metrics) {
+      var bits = [];
+      if (metrics && metrics.rule_pack_version) bits.push('Pack ' + metrics.rule_pack_version);
+      if (metrics && typeof metrics.rule_count === 'number') bits.push(metrics.rule_count + ' rules');
+      if (metrics && typeof metrics.fsi === 'number') {
+        var fsiText = 'FSI ' + metrics.fsi;
+        if (typeof metrics.max_fsi === 'number') fsiText += ' / ' + metrics.max_fsi;
+        bits.push(fsiText);
+      }
+      if (metrics && typeof metrics.coverage_pct === 'number') bits.push('Coverage ' + metrics.coverage_pct + '%');
+      if (metrics && typeof metrics.height_m === 'number') bits.push('Height ' + metrics.height_m + ' m');
+      return bits.map(function (b) { return '<span>' + b + '</span>'; }).join('');
+    }
+
+    Planara.onResult = function (payload) {
+      var ok = payload.ok;
+      var violations = payload.violations || [];
+      var metrics = payload.metrics || {};
+
+      var summary = document.getElementById('summary');
+      summary.className = 'summary ' + (ok ? 'ok' : 'fail');
+      summary.textContent = ok
+        ? 'Design is compliant.'
+        : violations.length + ' violation' + (violations.length === 1 ? '' : 's') + ' — design is not compliant.';
+
+      document.getElementById('meta').innerHTML = fmtMeta(metrics);
+
+      var table = document.getElementById('violations-table');
+      var body = document.getElementById('violations-body');
+      body.innerHTML = '';
+
+      if (!violations.length) {
+        table.style.display = 'none';
+        return;
+      }
+
+      violations.forEach(function (v) {
+        var tr = document.createElement('tr');
+        tr.className = v.severity || '';
+        tr.innerHTML =
+          '<td class="severity"><span class="pill ' + (v.severity || '') + '">' +
+            (v.severity || '') +
+          '</span></td>' +
+          '<td><code>' + (v.rule_id || '') + '</code></td>' +
+          '<td>' + escapeHtml(v.message || '') + '</td>';
+        body.appendChild(tr);
+      });
+      table.style.display = '';
+    };
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.sketchup && typeof window.sketchup.ready === 'function') {
+        window.sketchup.ready('');
+      }
+    });
+  </script>
+</body>
+</html>
