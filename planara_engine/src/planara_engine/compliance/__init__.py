@@ -5,6 +5,7 @@ registry as a side effect. The api/app.py lifespan import is what
 triggers registration in production; tests import it directly.
 """
 
+from planara_engine.compliance import coverage  # noqa: F401 — side-effect import
 from planara_engine.compliance import fsi  # noqa: F401 — side-effect import
 from planara_engine.compliance import setback  # noqa: F401 — side-effect import
 
