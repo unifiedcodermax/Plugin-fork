@@ -25,7 +25,7 @@ def test_settings() -> Settings:
         host="127.0.0.1",
         log_level="WARNING",
         log_json=False,
-        jwt_secret="test-secret-not-for-prod",
+        jwt_secret="test-secret-not-for-prod-long-enough-for-hs256",
         jwt_ttl_minutes=60,
         db_url="sqlite:///:memory:",
         _env_file=None,  # type: ignore[call-arg]
