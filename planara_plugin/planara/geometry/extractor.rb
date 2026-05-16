@@ -41,13 +41,17 @@ module Planara
       FLOOR_NAME_REGEX = /^floor\s*(-?\d+)$/i.freeze
       PLOT_NAME_REGEX  = /^plot$/i.freeze
 
+      # Wire-format version the plugin emits. The engine accepts and
+      # warns on mismatch; bump alongside any non-additive change.
+      SCHEMA_VERSION = '1.0'
+
       module_function
 
       # Build a Snapshot payload from the active model.
       #
       # @param model [Sketchup::Model]
-      # @param project [Hash] { city:, classification:, zone: } pulled
-      #   from the project-setup dialog.
+      # @param project [Hash] { city:, classification:, zone:, overlays: }.
+      #   overlays defaults to [] when missing. Symbol keys.
       # @param parking_slots [Integer] number of slots the user reports
       #   the design provides. Surfaced to the parking evaluator.
       # @return [Hash] the JSON-ready Snapshot payload.
@@ -64,9 +68,23 @@ module Planara
 
         floor_payloads = floors.map { |level, entity| floor_payload(level, entity) }.compact
 
-        {
-          snapshot_id: SecureRandom.uuid,
+        build_payload(
+          plot_polygon: plot_polygon,
+          floor_payloads: floor_payloads,
           project: project,
+          parking_slots: parking_slots
+        )
+      end
+
+      # Pure data assembly — no SketchUp references. Lives outside
+      # `extract` so it can be exercised by `test/test_extractor.rb`
+      # outside the SketchUp host. The shape pinned here IS the
+      # Ruby↔Python wire contract.
+      def build_payload(plot_polygon:, floor_payloads:, project:, parking_slots: 0)
+        {
+          schema_version: SCHEMA_VERSION,
+          snapshot_id: SecureRandom.uuid,
+          project: normalize_project(project),
           plot: {
             polygon: { exterior: plot_polygon[:exterior] },
             area_m2: plot_polygon[:area_m2],
@@ -75,6 +93,23 @@ module Planara
             floors: floor_payloads,
             parking_slots_provided: parking_slots.to_i,
           },
+        }
+      end
+
+      # Coerce loose project hashes (symbol or string keys, missing
+      # overlays) into the canonical shape the engine expects. Keeps
+      # the rest of the plugin from caring about which form Session
+      # or a dialog handed us.
+      def normalize_project(project)
+        h = project || {}
+        get = ->(k) { h[k] || h[k.to_s] }
+        overlays = get.call(:overlays) || []
+        overlays = overlays.to_a.map(&:to_s).map(&:strip).reject(&:empty?)
+        {
+          city: get.call(:city).to_s,
+          classification: get.call(:classification).to_s,
+          zone: get.call(:zone).to_s,
+          overlays: overlays,
         }
       end
 
