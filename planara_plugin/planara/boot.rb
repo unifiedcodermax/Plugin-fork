@@ -56,26 +56,26 @@ module Planara
       run_validation_once
     end
 
-    # Demo path until observers arrive: prompt for project metadata,
-    # extract a Snapshot, post /validate, render the response.
+    # Demo path until observers arrive: ensure project metadata is
+    # captured, extract a Snapshot, post /validate, render the response.
     def run_validation_once
-      project, parking_slots = prompt_project_setup
-      return unless project
+      ensure_project_setup or return
 
       model = Sketchup.active_model
       snapshot = Geometry::Extractor.extract(
         model: model,
-        project: project,
-        parking_slots: parking_slots
+        project: Session.project,
+        parking_slots: Session.project[:parking_slots]
       )
       Logger.info(
         'snapshot_extracted',
         floors: snapshot[:building][:floors].length,
         plot_area_m2: snapshot[:plot][:area_m2]&.round(2),
-        parking_slots: snapshot[:building][:parking_slots_provided]
+        parking_slots: snapshot[:building][:parking_slots_provided],
+        overlays: snapshot[:project][:overlays]
       )
 
-      response = EngineClient.post('/validate', snapshot)
+      response = EngineClient.validate(snapshot)
       show_validation_result(response)
     rescue Geometry::Extractor::ExtractionError => e
       ::UI.messagebox("Could not read the model:\n\n#{e.message}\n\n" \
@@ -84,20 +84,39 @@ module Planara
       ::UI.messagebox("Validation failed: #{e.message}")
     end
 
+    # Re-prompt only when Session has no project yet; the live loop
+    # (Sprint 6) reuses Session.project across many validations.
+    def ensure_project_setup
+      return true if Session.project_ready?
+
+      project = prompt_project_setup
+      return false unless project
+
+      Session.project = project
+      Logger.info('project_set', project: project)
+      true
+    end
+
     def prompt_project_setup
       prompts = [
         'City',
         'Classification (Heritage / CBD / HDZ)',
         'Zone (Residential / Commercial / Industry)',
+        'Overlays (comma-separated, blank for none)',
         'Parking slots provided'
       ]
-      defaults = ['Bangalore', 'CBD', 'Residential', '0']
+      defaults = ['Bangalore', 'CBD', 'Residential', '', '0']
       input = ::UI.inputbox(prompts, defaults, 'Planara — Project setup')
-      return [nil, 0] unless input
+      return nil unless input
 
-      project = { city: input[0], classification: input[1], zone: input[2] }
-      parking = input[3].to_i
-      [project, parking]
+      overlays = input[3].to_s.split(',').map(&:strip).reject(&:empty?)
+      {
+        city: input[0],
+        classification: input[1],
+        zone: input[2],
+        overlays: overlays,
+        parking_slots: input[4].to_i,
+      }
     end
 
     def show_validation_result(response)
