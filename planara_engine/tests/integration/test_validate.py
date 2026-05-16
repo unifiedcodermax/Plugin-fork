@@ -304,3 +304,135 @@ def test_baseline_returns_fresh_dict() -> None:
     b = _baseline()
     b["building"]["floors"][0]["level"] = 99
     assert _baseline()["building"]["floors"][0]["level"] == 0
+
+
+# ---- overlays ----------------------------------------------------------------
+
+
+def _tall(snap: dict[str, Any], n_floors: int, h_per_floor: float = 3.0) -> dict[str, Any]:
+    """Replace the baseline's single floor with n stacked floors of
+    h_per_floor m each. Keeps the 10×10 footprint at (20, 20)."""
+
+    snap["building"]["floors"] = [
+        {
+            "level": i,
+            "polygon": {"exterior": _square(10.0, 20.0, 20.0)},
+            "height_m": h_per_floor,
+            "is_habitable": True,
+        }
+        for i in range(n_floors)
+    ]
+    return snap
+
+
+def test_no_overlay_skips_height_rules_even_for_tall_building(
+    app_client: TestClient, authed_headers: dict[str, str]
+) -> None:
+    """Tall building with NO overlays must not fire either height rule.
+    Overlay rules are opt-in; the absence of an overlay key is the
+    user saying 'this site isn't in that zone'."""
+
+    snap = _tall(_baseline(), n_floors=20)  # 60m, well above both overlay caps.
+    # Boost parking and stay within FSI limit by keeping footprint small:
+    # 20 × 100 = 2000m^2 / 2500 = 0.8 FSI (under 2.5 cap).
+    snap["building"]["parking_slots_provided"] = 30  # 2000/100 + 10% = 22.
+
+    resp = app_client.post("/validate", json=snap, headers=authed_headers)
+    body = resp.json()
+    by_cat = _violations_by_category(body)
+    assert "height" not in by_cat, body
+    assert body["metrics"]["rule_count"] == 5
+
+
+def test_airport_overlay_triggers_height_violation(
+    app_client: TestClient, authed_headers: dict[str, str]
+) -> None:
+    """20 × 3m = 60m > 45m airport cap → violation fires."""
+
+    snap = _tall(_baseline(), n_floors=20)
+    snap["project"]["overlays"] = ["airport"]
+    snap["building"]["parking_slots_provided"] = 30
+
+    resp = app_client.post("/validate", json=snap, headers=authed_headers)
+    body = resp.json()
+    by_cat = _violations_by_category(body)
+    assert "height" in by_cat, body
+    v = by_cat["height"][0]
+    assert v["rule_id"] == "blr.overlay.airport.height"
+    assert v["computed"]["height_m"] == 60.0
+    assert v["computed"]["max_height_m"] == 45.0
+    assert v["severity"] == "error"
+    assert body["ok"] is False
+
+
+def test_airport_overlay_compliant_height_passes(
+    app_client: TestClient, authed_headers: dict[str, str]
+) -> None:
+    """Same overlay, 10-floor / 30m building → under 45m, no violation,
+    but the overlay rule still fired (rule_count = base + 1)."""
+
+    snap = _tall(_baseline(), n_floors=10)
+    snap["project"]["overlays"] = ["airport"]
+    snap["building"]["parking_slots_provided"] = 15  # 1000/100 + 10% = 11.
+
+    resp = app_client.post("/validate", json=snap, headers=authed_headers)
+    body = resp.json()
+    by_cat = _violations_by_category(body)
+    assert "height" not in by_cat, body
+    assert body["metrics"]["rule_count"] == 6
+    assert body["metrics"]["height_m"] == 30.0
+
+
+def test_heritage_influence_overlay_triggers_height_violation(
+    app_client: TestClient, authed_headers: dict[str, str]
+) -> None:
+    """5 × 3m = 15m > 12m heritage skyline → violation fires."""
+
+    snap = _tall(_baseline(), n_floors=5)
+    snap["project"]["overlays"] = ["heritage_influence"]
+    snap["building"]["parking_slots_provided"] = 10  # 500/100 + 10% = 6.
+
+    resp = app_client.post("/validate", json=snap, headers=authed_headers)
+    body = resp.json()
+    by_cat = _violations_by_category(body)
+    assert "height" in by_cat, body
+    assert by_cat["height"][0]["rule_id"] == "blr.overlay.heritage_influence.height"
+    assert by_cat["height"][0]["computed"]["max_height_m"] == 12.0
+
+
+def test_both_overlays_stack_both_violations_fire(
+    app_client: TestClient, authed_headers: dict[str, str]
+) -> None:
+    """50m building under both overlays violates both caps independently.
+    Two distinct height violations, distinct rule_ids."""
+
+    snap = _tall(_baseline(), n_floors=17, h_per_floor=3.0)  # 51m.
+    snap["project"]["overlays"] = ["airport", "heritage_influence"]
+    snap["building"]["parking_slots_provided"] = 25  # 1700/100 + 10% = 19.
+
+    resp = app_client.post("/validate", json=snap, headers=authed_headers)
+    body = resp.json()
+    by_cat = _violations_by_category(body)
+    assert "height" in by_cat
+    rule_ids = sorted(v["rule_id"] for v in by_cat["height"])
+    assert rule_ids == [
+        "blr.overlay.airport.height",
+        "blr.overlay.heritage_influence.height",
+    ]
+
+
+def test_unknown_overlay_silently_fires_nothing(
+    app_client: TestClient, authed_headers: dict[str, str]
+) -> None:
+    """An overlay key that no rule references must not error — it just
+    doesn't add any rules. Lets the Ruby side ship an overlay name
+    before the pack catches up, without breaking validation."""
+
+    snap = _tall(_baseline(), n_floors=20)
+    snap["project"]["overlays"] = ["fire_zone"]  # no rule in 0.3.0 yet.
+    snap["building"]["parking_slots_provided"] = 30
+
+    resp = app_client.post("/validate", json=snap, headers=authed_headers)
+    body = resp.json()
+    assert "height" not in _violations_by_category(body)
+    assert body["metrics"]["rule_count"] == 5
