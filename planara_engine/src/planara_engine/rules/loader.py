@@ -80,13 +80,33 @@ def _check_unique_rule_ids(pack: RulePack) -> None:
         )
 
 
-def applicable_rules(pack: RulePack, *, classification: str, zone: str) -> list[Rule]:
-    """Filter the pack's rules to those matching ``(classification, zone)``.
+def applicable_rules(
+    pack: RulePack,
+    *,
+    classification: str,
+    zone: str,
+    overlays: list[str] | None = None,
+) -> list[Rule]:
+    """Filter the pack's rules to those matching the project context.
 
     A rule's ``applies_when`` fields use ``None`` as wildcard.
+
+    Overlay semantics:
+      - Rule has applies_when.overlay = None  -> base rule, always
+        eligible (overlays don't exclude it).
+      - Rule has applies_when.overlay = "X"   -> overlay rule, fires
+        only when "X" is in ``overlays``.
+      - Overlay rules ADD to base rules; they don't replace. To
+        override a base value with a stricter limit, ship an
+        overlay rule with a distinct rule_id and the stricter
+        param value — both rules fire; the worst-case violation
+        is what the user sees.
+
     Returns rules in their original order so the engine's
     violation list is stable.
     """
+
+    active_overlays = set(overlays or [])
 
     out: list[Rule] = []
     for rule in pack.rules:
@@ -94,6 +114,8 @@ def applicable_rules(pack: RulePack, *, classification: str, zone: str) -> list[
         if when.classification is not None and when.classification != classification:
             continue
         if when.zone is not None and when.zone != zone:
+            continue
+        if when.overlay is not None and when.overlay not in active_overlays:
             continue
         out.append(rule)
     return out

@@ -25,10 +25,18 @@ class Applicability(BaseModel):
     Any field set to None means "matches anything for this
     dimension". A rule with classification=None applies to every
     classification in the rule's city.
+
+    ``overlay`` is the Sprint-5 addition. When set, the rule fires
+    only when ``Project.overlays`` contains that overlay key.
+    Overlay rules fire IN ADDITION to base rules (the matcher does
+    not exclude either side); to override a base limit, ship an
+    overlay rule with a stricter param value and a distinct
+    rule_id.
     """
 
     classification: str | None = None
     zone: str | None = None
+    overlay: str | None = None
 
 
 class Rule(BaseModel):

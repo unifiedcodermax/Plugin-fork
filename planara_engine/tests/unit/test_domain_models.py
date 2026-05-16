@@ -55,6 +55,22 @@ def test_project_minimal() -> None:
     Project(city="Bangalore", classification="CBD", zone="Residential")
 
 
+def test_project_overlays_default_empty() -> None:
+    p = Project(city="Bangalore", classification="CBD", zone="Residential")
+    assert p.overlays == []
+
+
+def test_project_overlays_round_trip() -> None:
+    p = Project(
+        city="Bangalore",
+        classification="CBD",
+        zone="Residential",
+        overlays=["airport", "heritage_influence"],
+    )
+    restored = Project.model_validate_json(p.model_dump_json())
+    assert restored.overlays == ["airport", "heritage_influence"]
+
+
 def test_plot_with_optional_area() -> None:
     poly = Polygon(exterior=[[0, 0], [10, 0], [10, 10]])
     Plot(polygon=poly, area_m2=50.0)

@@ -26,6 +26,7 @@ def evaluate(snapshot: Snapshot) -> ValidationResponse:
         pack,
         classification=snapshot.project.classification,
         zone=snapshot.project.zone,
+        overlays=snapshot.project.overlays,
     )
 
     log.info(
@@ -34,6 +35,7 @@ def evaluate(snapshot: Snapshot) -> ValidationResponse:
         city=snapshot.project.city,
         classification=snapshot.project.classification,
         zone=snapshot.project.zone,
+        overlays=snapshot.project.overlays,
         rule_count=len(matched),
     )
 
