@@ -18,11 +18,11 @@ from planara_engine.rules.loader import PACKS_DIR, get_pack, load_pack
 
 
 # Bumped per pack version. Update alongside the JSON.
-CURRENT_VERSION = "0.2.0"
+CURRENT_VERSION = "0.3.0"
 
-# Categories expected to fire for every (classification, zone) cell.
-# Adding a new evaluator means adding its category here and one rule
-# per cell in the JSON.
+# Categories expected to fire for every (classification, zone) cell
+# when NO overlays are active. Overlay-only categories (e.g. height)
+# are tested separately below.
 EXPECTED_CATEGORIES_PER_CELL = {"fsi", "setback", "coverage", "open_space", "parking"}
 
 
@@ -37,8 +37,9 @@ def test_pack_loads_clean() -> None:
     pack = load_pack("Bangalore")
     assert pack.city == "Bangalore"
     assert pack.version == CURRENT_VERSION
-    # 9 FSI + 9 setback + 3 coverage + 3 open_space + 3 parking = 27.
-    assert len(pack.rules) == 27
+    # 9 FSI + 9 setback + 3 coverage + 3 open_space + 3 parking
+    # + 2 overlay height = 29.
+    assert len(pack.rules) == 29
 
 
 @pytest.mark.parametrize("classification", ["Heritage", "CBD", "HDZ"])
@@ -122,3 +123,77 @@ def test_coverage_open_space_parking_apply_by_zone_only() -> None:
         for r in rules:
             assert r.applies_when.classification is None
             assert r.applies_when.zone in {"Residential", "Commercial", "Industry"}
+
+
+# ---- overlay rules -----------------------------------------------------------
+
+
+def test_overlay_height_rules_skipped_without_overlay() -> None:
+    """A plot with no overlays must not pick up the overlay height rules,
+    regardless of classification/zone."""
+
+    pack = load_pack("Bangalore")
+    matched = applicable_rules(
+        pack, classification="CBD", zone="Commercial", overlays=[]
+    )
+    assert "height" not in {r.category for r in matched}
+
+
+def test_airport_overlay_adds_height_rule() -> None:
+    pack = load_pack("Bangalore")
+    matched = applicable_rules(
+        pack,
+        classification="CBD",
+        zone="Commercial",
+        overlays=["airport"],
+    )
+    ids = [r.id for r in matched]
+    assert "blr.overlay.airport.height" in ids
+    assert "blr.overlay.heritage_influence.height" not in ids
+
+
+def test_heritage_influence_overlay_adds_height_rule() -> None:
+    pack = load_pack("Bangalore")
+    matched = applicable_rules(
+        pack,
+        classification="HDZ",
+        zone="Residential",
+        overlays=["heritage_influence"],
+    )
+    ids = [r.id for r in matched]
+    assert "blr.overlay.heritage_influence.height" in ids
+    assert "blr.overlay.airport.height" not in ids
+
+
+def test_both_overlays_stack() -> None:
+    """When a plot sits inside the airport zone AND the heritage skyline,
+    BOTH height limits fire. The user sees the worst-case violation."""
+
+    pack = load_pack("Bangalore")
+    matched = applicable_rules(
+        pack,
+        classification="CBD",
+        zone="Commercial",
+        overlays=["airport", "heritage_influence"],
+    )
+    height_ids = sorted(r.id for r in matched if r.category == "height")
+    assert height_ids == [
+        "blr.overlay.airport.height",
+        "blr.overlay.heritage_influence.height",
+    ]
+
+
+def test_overlay_rules_preserve_base_rule_count() -> None:
+    """Overlay rules must ADD to base; an overlay being present must
+    not cause base rules (FSI/setback/coverage/etc.) to drop out."""
+
+    pack = load_pack("Bangalore")
+    base = applicable_rules(
+        pack, classification="CBD", zone="Commercial", overlays=[]
+    )
+    with_overlay = applicable_rules(
+        pack, classification="CBD", zone="Commercial", overlays=["airport"]
+    )
+    assert len(with_overlay) == len(base) + 1
+    base_ids = {r.id for r in base}
+    assert base_ids.issubset({r.id for r in with_overlay})

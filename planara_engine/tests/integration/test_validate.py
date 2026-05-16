@@ -124,7 +124,9 @@ def test_baseline_passes_every_rule(
     body = resp.json()
     assert body["ok"] is True, body["violations"]
     assert body["violations"] == []
-    assert body["metrics"]["rule_pack_version"] == "0.2.0"
+    assert body["metrics"]["rule_pack_version"] == "0.3.0"
+    # No overlays in the baseline snapshot → only the 5 base categories
+    # fire (overlay height rules are skipped).
     assert body["metrics"]["rule_count"] == 5  # fsi + setback + coverage + open_space + parking
 
 
