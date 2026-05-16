@@ -5,8 +5,8 @@ require_relative 'hash_utils'
     module DataPoints 
         extend self
        
-        @data_store = {          
-          plot_area: 0.0,          
+        @data_store = {
+          plot_area: 0.0,
           build: 0.0,
           fsi: 0.0,
           height: 0.0,
@@ -15,7 +15,8 @@ require_relative 'hash_utils'
           fsi_limit: 0.0,
           locationClassification: "",
           zone: "",
-          setback_limit: 0.0          
+          setback_limit: 0.0,
+          overlays: []
         }
         
 
@@ -32,9 +33,10 @@ require_relative 'hash_utils'
             set(:boundary_west,0.0)
             set(:locationClassification,"")
             set(:zone,"")
-            set(:fsi_mode,"") 
+            set(:fsi_mode,"")
             set(:setback_limit, 0.0)
-        
+            set(:overlays, [])
+
         end
  
 
