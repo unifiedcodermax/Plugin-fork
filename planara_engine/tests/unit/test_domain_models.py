@@ -168,6 +168,35 @@ def test_snapshot_round_trip_through_json() -> None:
     assert len(restored.building.floors) == 2
 
 
+def test_snapshot_schema_version_defaults() -> None:
+    """A snapshot built without schema_version assumes the current
+    wire version. The plugin always emits it; old recorded JSON
+    fixtures captured before Sprint 6 can still round-trip."""
+
+    from planara_engine.domain.snapshot import CURRENT_SCHEMA_VERSION
+
+    snap = Snapshot(
+        project=Project(city="Bangalore", classification="CBD", zone="Residential"),
+        plot=Plot(polygon=_square(20)),
+        building=Building(floors=[Floor(level=0, polygon=_square(15), height_m=3.0)]),
+    )
+    assert snap.schema_version == CURRENT_SCHEMA_VERSION
+
+
+def test_snapshot_accepts_older_schema_version() -> None:
+    """Older clients must not be rejected for declaring an old
+    schema_version — the engine logs and continues. The plugin
+    ships ahead of the engine in some deploys."""
+
+    snap = Snapshot(
+        schema_version="0.9",
+        project=Project(city="Bangalore", classification="CBD", zone="Residential"),
+        plot=Plot(polygon=_square(20)),
+        building=Building(floors=[Floor(level=0, polygon=_square(15), height_m=3.0)]),
+    )
+    assert snap.schema_version == "0.9"
+
+
 # ---- Violation / ValidationResponse -----------------------------------------
 
 
