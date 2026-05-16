@@ -1,0 +1,87 @@
+{
+  "city": "Bangalore",
+  "version": "0.1.0",
+  "rules": [
+    {
+      "id": "blr.fsi.heritage.residential",
+      "category": "fsi",
+      "applies_when": { "classification": "Heritage", "zone": "Residential" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.0, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Heritage/Residential limit of {max_fsi}. Built-up: {built_up_m2} m² on a {plot_area_m2} m² plot."
+    },
+    {
+      "id": "blr.fsi.heritage.commercial",
+      "category": "fsi",
+      "applies_when": { "classification": "Heritage", "zone": "Commercial" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.5, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Heritage/Commercial limit of {max_fsi}."
+    },
+    {
+      "id": "blr.fsi.heritage.industry",
+      "category": "fsi",
+      "applies_when": { "classification": "Heritage", "zone": "Industry" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 0.8 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Heritage/Industry limit of {max_fsi}."
+    },
+    {
+      "id": "blr.fsi.cbd.residential",
+      "category": "fsi",
+      "applies_when": { "classification": "CBD", "zone": "Residential" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 2.5, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the CBD/Residential limit of {max_fsi}."
+    },
+    {
+      "id": "blr.fsi.cbd.commercial",
+      "category": "fsi",
+      "applies_when": { "classification": "CBD", "zone": "Commercial" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 4.0, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the CBD/Commercial limit of {max_fsi}."
+    },
+    {
+      "id": "blr.fsi.cbd.industry",
+      "category": "fsi",
+      "applies_when": { "classification": "CBD", "zone": "Industry" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 3.0 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the CBD/Industry limit of {max_fsi}."
+    },
+    {
+      "id": "blr.fsi.hdz.residential",
+      "category": "fsi",
+      "applies_when": { "classification": "HDZ", "zone": "Residential" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.2, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the HDZ/Residential limit of {max_fsi}."
+    },
+    {
+      "id": "blr.fsi.hdz.commercial",
+      "category": "fsi",
+      "applies_when": { "classification": "HDZ", "zone": "Commercial" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 2.0, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the HDZ/Commercial limit of {max_fsi}."
+    },
+    {
+      "id": "blr.fsi.hdz.industry",
+      "category": "fsi",
+      "applies_when": { "classification": "HDZ", "zone": "Industry" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.5 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the HDZ/Industry limit of {max_fsi}."
+    }
+  ]
+}
