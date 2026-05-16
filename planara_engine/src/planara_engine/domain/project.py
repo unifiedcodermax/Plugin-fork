@@ -1,0 +1,32 @@
+"""Project metadata: classification, zone, city.
+
+These are the dimensions rule applicability is keyed on. Strings
+are intentionally not constrained to enums here — the rule pack
+defines the universe of valid values for a given city, and a
+typo in the plugin should surface as "no rules matched" rather
+than "validation rejected your enum value", so the user can fix
+it.
+"""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+
+class Project(BaseModel):
+    """Compliance context for a single design.
+
+    classification: typically CBD / Heritage / HDZ for Bangalore.
+                    Other cities will use other tags.
+    zone:           Residential / Commercial / Industrial / etc.
+    city:           Rule-pack key. Determines which pack to load.
+    road_widths_m:  Optional per-edge road width, in meters.
+                    The legacy rules.json prices FAR premiums by
+                    "front road width"; future evaluators will
+                    consume this. Optional in v0.1.
+    """
+
+    city: str = Field(min_length=1, max_length=64)
+    classification: str = Field(min_length=1, max_length=64)
+    zone: str = Field(min_length=1, max_length=64)
+    road_widths_m: dict[str, float] = Field(default_factory=dict)

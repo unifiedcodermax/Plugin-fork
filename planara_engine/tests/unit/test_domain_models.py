@@ -1,0 +1,147 @@
+"""Domain model validation: shape rules, edge cases."""
+
+from __future__ import annotations
+
+import pytest
+from pydantic import ValidationError
+
+from planara_engine.domain import (
+    Building,
+    Floor,
+    Plot,
+    Polygon,
+    Project,
+    Severity,
+    Snapshot,
+    ValidationResponse,
+    Violation,
+)
+
+
+# ---- Polygon -----------------------------------------------------------------
+
+
+def test_polygon_minimum_valid() -> None:
+    p = Polygon(exterior=[[0, 0], [10, 0], [10, 10]])
+    assert len(p.exterior) == 3
+
+
+def test_polygon_accepts_closed_ring_form() -> None:
+    Polygon(exterior=[[0, 0], [10, 0], [10, 10], [0, 0]])
+
+
+def test_polygon_rejects_too_few_points() -> None:
+    with pytest.raises(ValidationError):
+        Polygon(exterior=[[0, 0], [1, 0]])
+
+
+def test_polygon_rejects_consecutive_duplicates() -> None:
+    with pytest.raises(ValidationError, match="consecutive duplicate"):
+        Polygon(exterior=[[0, 0], [0, 0], [10, 10]])
+
+
+def test_polygon_with_hole() -> None:
+    p = Polygon(
+        exterior=[[0, 0], [10, 0], [10, 10], [0, 10]],
+        holes=[[[2, 2], [4, 2], [4, 4]]],
+    )
+    assert len(p.holes) == 1
+
+
+# ---- Project / Plot ----------------------------------------------------------
+
+
+def test_project_minimal() -> None:
+    Project(city="Bangalore", classification="CBD", zone="Residential")
+
+
+def test_plot_with_optional_area() -> None:
+    poly = Polygon(exterior=[[0, 0], [10, 0], [10, 10]])
+    Plot(polygon=poly, area_m2=50.0)
+    Plot(polygon=poly)  # area_m2 optional
+
+
+def test_plot_rejects_non_positive_area() -> None:
+    poly = Polygon(exterior=[[0, 0], [10, 0], [10, 10]])
+    with pytest.raises(ValidationError):
+        Plot(polygon=poly, area_m2=0.0)
+
+
+# ---- Building / Floor --------------------------------------------------------
+
+
+def _square(size: float = 10.0) -> Polygon:
+    return Polygon(exterior=[[0, 0], [size, 0], [size, size], [0, size]])
+
+
+def test_building_with_one_floor() -> None:
+    b = Building(floors=[Floor(level=0, polygon=_square(), height_m=3.0)])
+    assert len(b.floors) == 1
+
+
+def test_floor_height_bounded() -> None:
+    with pytest.raises(ValidationError):
+        Floor(level=0, polygon=_square(), height_m=0)
+    with pytest.raises(ValidationError):
+        Floor(level=0, polygon=_square(), height_m=31)
+
+
+def test_building_rejects_duplicate_levels() -> None:
+    with pytest.raises(ValidationError, match="duplicate floor levels"):
+        Building(
+            floors=[
+                Floor(level=0, polygon=_square(), height_m=3.0),
+                Floor(level=0, polygon=_square(), height_m=3.0),
+            ]
+        )
+
+
+def test_building_requires_at_least_one_floor() -> None:
+    with pytest.raises(ValidationError):
+        Building(floors=[])
+
+
+# ---- Snapshot ----------------------------------------------------------------
+
+
+def test_snapshot_assigns_uuid_when_missing() -> None:
+    snap = Snapshot(
+        project=Project(city="Bangalore", classification="CBD", zone="Residential"),
+        plot=Plot(polygon=_square(20)),
+        building=Building(floors=[Floor(level=0, polygon=_square(15), height_m=3.0)]),
+    )
+    assert snap.snapshot_id is not None
+
+
+def test_snapshot_round_trip_through_json() -> None:
+    snap = Snapshot(
+        project=Project(city="Bangalore", classification="CBD", zone="Residential"),
+        plot=Plot(polygon=_square(20), area_m2=400.0),
+        building=Building(
+            floors=[
+                Floor(level=0, polygon=_square(15), height_m=3.0),
+                Floor(level=1, polygon=_square(15), height_m=3.0),
+            ]
+        ),
+    )
+    payload = snap.model_dump_json()
+    restored = Snapshot.model_validate_json(payload)
+    assert restored.snapshot_id == snap.snapshot_id
+    assert len(restored.building.floors) == 2
+
+
+# ---- Violation / ValidationResponse -----------------------------------------
+
+
+def test_validation_response_ok_with_no_errors() -> None:
+    resp = ValidationResponse(snapshot_id=Snapshot.model_construct().snapshot_id, ok=True)
+    assert resp.violations == []
+    assert resp.metrics == {}
+
+
+def test_violation_severity_enum() -> None:
+    v = Violation(rule_id="x", category="fsi", severity=Severity.error, message="m")
+    assert v.severity == "error"
+    # String compatible: JSON serialization keeps the enum value as a string.
+    dumped = v.model_dump(mode="json")
+    assert dumped["severity"] == "error"
