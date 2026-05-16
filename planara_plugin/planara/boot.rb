@@ -17,6 +17,7 @@ require_relative 'logger'
 require_relative 'session'
 require_relative 'engine_client'
 require_relative 'engine_supervisor'
+require_relative 'ui/login_dialog'
 
 module Planara
   module Boot
@@ -39,13 +40,21 @@ module Planara
         return
       end
 
-      # Sprint 2 will:
-      #   - Show the login dialog (Planara::UI::Login.show).
-      #   - On successful login, attach observers and show the
-      #     results panel.
-      UI.messagebox(
-        "Planara engine is running at #{Config.engine_url}.\n\n" \
-        "Login UI and live validation will arrive in Sprint 2."
+      if Session.authenticated?
+        on_authenticated
+      else
+        UI::LoginDialog.show(on_success: method(:on_authenticated))
+      end
+    end
+
+    # Called once a valid JWT is stored in Session. Sprint 3 will
+    # take over this hook to attach observers and show the live
+    # results panel. For now it confirms the round-trip.
+    def on_authenticated
+      Logger.info('authenticated', token_length: Session.token&.length)
+      ::UI.messagebox(
+        "Signed in to Planara.\n\n" \
+        "Live validation and observers will arrive in Sprint 3."
       )
     end
 

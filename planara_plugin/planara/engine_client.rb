@@ -41,7 +41,13 @@ module Planara
     # @return [Hash] parsed /health body when up.
     # @raise [EngineError] when not.
     def health
-      get('/health')
+      get('/health', authenticated: false)
+    end
+
+    # Fetch the currently authenticated user from the engine.
+    # @raise [EngineError] when no/expired token, or any transport error.
+    def me
+      get('/auth/me')
     end
 
     # POST /auth/login → { token: "..." } (wired up in Sprint 2).
@@ -61,8 +67,11 @@ module Planara
 
     # -- transport ----------------------------------------------------------
 
-    def get(path)
-      request(Net::HTTP::Get.new(uri_for(path).request_uri), uri_for(path))
+    def get(path, authenticated: true)
+      uri = uri_for(path)
+      req = Net::HTTP::Get.new(uri.request_uri)
+      apply_auth(req) if authenticated
+      request(req, uri)
     end
 
     def post(path, payload, authenticated: true)

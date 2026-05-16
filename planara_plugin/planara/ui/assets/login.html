@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Planara — Sign in</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --fg: #1f2328;
+      --muted: #5e6471;
+      --border: #d0d7de;
+      --accent: #1f6feb;
+      --accent-fg: #ffffff;
+      --error-bg: #ffe9e9;
+      --error-fg: #a40e0e;
+      --pending-bg: #f3f4f6;
+      --pending-fg: #5e6471;
+      --ok-bg: #e7f7e8;
+      --ok-fg: #167314;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 22px 28px;
+      color: var(--fg);
+      background: #ffffff;
+    }
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 4px 0;
+    }
+    p.lead {
+      margin: 0 0 18px 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      margin: 10px 0 4px 0;
+    }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 7px 9px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(31,111,235,0.15);
+    }
+    .actions {
+      margin-top: 18px;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    button {
+      padding: 7px 14px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #f6f8fa;
+      color: var(--fg);
+    }
+    button.primary {
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-color: var(--accent);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 14px;
+      padding: 8px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      display: none;
+    }
+    .status.error   { background: var(--error-bg);   color: var(--error-fg);   display: block; }
+    .status.pending { background: var(--pending-bg); color: var(--pending-fg); display: block; }
+    .status.ok      { background: var(--ok-bg);      color: var(--ok-fg);      display: block; }
+  </style>
+</head>
+<body>
+  <h1>Sign in to Planara</h1>
+  <p class="lead">Connect this SketchUp session to the compliance engine.</p>
+
+  <form id="login-form" autocomplete="off">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" autocomplete="username" required autofocus />
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" autocomplete="current-password" required />
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+
+    <div class="actions">
+      <button type="button" id="cancel">Cancel</button>
+      <button type="submit" id="submit" class="primary">Sign in</button>
+    </div>
+  </form>
+
+  <script>
+    window.Planara = window.Planara || {};
+
+    Planara.onStatus = function (payload) {
+      var box = document.getElementById('status');
+      box.className = 'status ' + (payload.kind || '');
+      box.textContent = payload.message || '';
+
+      var submit = document.getElementById('submit');
+      submit.disabled = payload.kind === 'pending';
+    };
+
+    document.getElementById('login-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var u = document.getElementById('username').value.trim();
+      var p = document.getElementById('password').value;
+      // sketchup.<callback> is provided by UI::HtmlDialog's bridge.
+      sketchup.submit_login(JSON.stringify({ username: u, password: p }));
+    });
+
+    document.getElementById('cancel').addEventListener('click', function () {
+      sketchup.cancel_login('');
+    });
+  </script>
+</body>
+</html>
