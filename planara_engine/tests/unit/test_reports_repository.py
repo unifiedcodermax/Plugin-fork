@@ -25,6 +25,7 @@ from planara_engine.domain import (
 from planara_engine.persistence.models import User, ValidationReport
 from planara_engine.persistence.reports import (
     count_reports,
+    get_prior_report,
     get_report,
     list_reports,
     save_report,
@@ -311,3 +312,59 @@ def test_get_report_returns_none_for_unknown_id(engine: Engine, alice_id: int) -
     with Session(engine) as s:
         got = get_report(s, user_id=alice_id, report_id=UUID(int=0))
         assert got is None
+
+
+# ---- get_prior_report --------------------------------------------------------
+
+
+def test_get_prior_returns_most_recent_earlier_match(engine: Engine, alice_id: int) -> None:
+    """Same (city, classification, zone), earliest timestamp before
+    target. Different contexts must be skipped."""
+
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    with Session(engine) as s:
+        a = save_report(s, user_id=alice_id, archive=_archive(snap=_snap(city="Bangalore", zone="Residential"), ts=base))
+        # Different city — skip when looking for prior of a Bangalore.
+        save_report(s, user_id=alice_id, archive=_archive(snap=_snap(city="Mumbai", classification="Island", zone="Residential"), ts=base + timedelta(hours=1)))
+        b = save_report(s, user_id=alice_id, archive=_archive(snap=_snap(city="Bangalore", zone="Residential"), ts=base + timedelta(hours=2)))
+        c = save_report(s, user_id=alice_id, archive=_archive(snap=_snap(city="Bangalore", zone="Residential"), ts=base + timedelta(hours=3)))
+        s.commit()
+        # Capture IDs before session close.
+        a_id, b_id, c_id = a.report_id, b.report_id, c.report_id
+
+    with Session(engine) as s:
+        prior_of_c = get_prior_report(s, user_id=alice_id, report_id=c_id)
+        assert prior_of_c is not None
+        assert prior_of_c.report_id == b_id
+
+        prior_of_b = get_prior_report(s, user_id=alice_id, report_id=b_id)
+        assert prior_of_b is not None
+        assert prior_of_b.report_id == a_id
+
+        prior_of_a = get_prior_report(s, user_id=alice_id, report_id=a_id)
+        assert prior_of_a is None
+
+
+def test_get_prior_other_user_returns_none(engine: Engine, alice_id: int, bob_id: int) -> None:
+    """Cross-user isolation: Bob's prior reports must not surface
+    when Alice asks for prior of Alice's report."""
+
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    with Session(engine) as s:
+        # Bob has earlier runs in the same context; they MUST NOT
+        # be returned as Alice's prior.
+        save_report(s, user_id=bob_id, archive=_archive(ts=base))
+        save_report(s, user_id=bob_id, archive=_archive(ts=base + timedelta(hours=1)))
+        a = save_report(s, user_id=alice_id, archive=_archive(ts=base + timedelta(hours=2)))
+        s.commit()
+        a_id = a.report_id
+
+    with Session(engine) as s:
+        prior = get_prior_report(s, user_id=alice_id, report_id=a_id)
+        assert prior is None
+
+
+def test_get_prior_unknown_id_returns_none(engine: Engine, alice_id: int) -> None:
+    with Session(engine) as s:
+        prior = get_prior_report(s, user_id=alice_id, report_id=UUID(int=0))
+        assert prior is None

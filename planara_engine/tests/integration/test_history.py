@@ -327,3 +327,166 @@ def test_get_html_user_scoped(
     rid = save.json()["report_id"]
     bob_resp = app_client.get(f"/history/{rid}/html", headers=bob)
     assert bob_resp.status_code == 404
+
+
+# ---- diff routes -------------------------------------------------------------
+
+
+def _save_failing(client: TestClient, headers: dict[str, str]) -> str:
+    """Save a snapshot that fails one rule (FSI 3.92 > 2.5)."""
+
+    snap = _bangalore()
+    snap["building"]["floors"] = [
+        {
+            "level": i,
+            "polygon": {"exterior": _square(35.0, 7.5, 7.5)},
+            "height_m": 3.0,
+            "is_habitable": True,
+        }
+        for i in range(8)
+    ]
+    snap["building"]["parking_slots_provided"] = 200
+    resp = client.post("/history", json=snap, headers=headers)
+    return resp.json()["report_id"]
+
+
+def test_diff_explicit_unchanged_when_same_id(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """Diff a report against itself — overall=unchanged."""
+
+    rid = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+    resp = app_client.get(f"/history/diff?from={rid}&to={rid}", headers=alice)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["overall"] == "unchanged"
+    assert body["from_report_id"] == rid
+    assert body["to_report_id"] == rid
+
+
+def test_diff_explicit_regressed_when_curr_introduces_violation(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """First save passes; second save introduces FSI violation
+    → diff verdict 'regressed', added=1."""
+
+    pass_id = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+    fail_id = _save_failing(app_client, alice)
+
+    resp = app_client.get(f"/history/diff?from={pass_id}&to={fail_id}", headers=alice)
+    body = resp.json()
+    assert body["overall"] == "regressed"
+    assert body["summary"]["added"] == 1
+    assert body["summary"]["removed"] == 0
+    rule_ids = [v["rule_id"] for v in body["violations"]]
+    assert "blr.fsi.cbd.residential" in rule_ids
+
+
+def test_diff_explicit_improved_when_curr_fixes_violation(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """Reverse of the previous: diff fail → pass → improved."""
+
+    fail_id = _save_failing(app_client, alice)
+    pass_id = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+
+    resp = app_client.get(f"/history/diff?from={fail_id}&to={pass_id}", headers=alice)
+    body = resp.json()
+    assert body["overall"] == "improved"
+    assert body["summary"]["removed"] == 1
+    assert body["summary"]["added"] == 0
+
+
+def test_diff_explicit_unknown_id_returns_404(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    rid = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+    fake = "00000000-0000-0000-0000-000000000000"
+
+    # 'from' missing
+    r1 = app_client.get(f"/history/diff?from={fake}&to={rid}", headers=alice)
+    assert r1.status_code == 404
+
+    # 'to' missing
+    r2 = app_client.get(f"/history/diff?from={rid}&to={fake}", headers=alice)
+    assert r2.status_code == 404
+
+
+def test_diff_explicit_other_users_report_returns_404(
+    app_client: TestClient, alice: dict[str, str], bob: dict[str, str]
+) -> None:
+    """Bob can't diff against Alice's report — surfaces as 404,
+    same as a nonexistent ID."""
+
+    alice_id = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+    bob_id = app_client.post("/history", json=_bangalore(), headers=bob).json()["report_id"]
+    resp = app_client.get(f"/history/diff?from={alice_id}&to={bob_id}", headers=bob)
+    assert resp.status_code == 404
+
+
+def test_diff_explicit_requires_auth(app_client: TestClient) -> None:
+    fake = "00000000-0000-0000-0000-000000000000"
+    resp = app_client.get(f"/history/diff?from={fake}&to={fake}")
+    assert resp.status_code == 401
+
+
+# ---- /history/{id}/diff (vs prior) -----------------------------------------
+
+
+def test_auto_diff_returns_404_when_no_prior_exists(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """First save has nothing to compare against."""
+
+    rid = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+    resp = app_client.get(f"/history/{rid}/diff", headers=alice)
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "not_found"
+
+
+def test_auto_diff_compares_against_most_recent_prior_same_context(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """Three saves of same project; auto-diff on the third reports
+    a clean diff against the second (the most recent prior in the
+    same context)."""
+
+    # First passing save.
+    app_client.post("/history", json=_bangalore(), headers=alice)
+    # Second still passing.
+    app_client.post("/history", json=_bangalore(), headers=alice)
+    # Third introduces failure.
+    fail_id = _save_failing(app_client, alice)
+
+    resp = app_client.get(f"/history/{fail_id}/diff", headers=alice)
+    body = resp.json()
+    assert body["overall"] == "regressed"
+    assert body["to_report_id"] == fail_id
+
+
+def test_auto_diff_ignores_other_context_runs(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """Mumbai run in between doesn't count as Bangalore's prior."""
+
+    blr1 = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+    # Mumbai run in between — different context, must be skipped.
+    app_client.post("/history", json=_mumbai(), headers=alice)
+    blr2 = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+
+    resp = app_client.get(f"/history/{blr2}/diff", headers=alice)
+    body = resp.json()
+    assert resp.status_code == 200
+    assert body["from_report_id"] == blr1
+    assert body["to_report_id"] == blr2
+
+
+def test_auto_diff_user_scoped(
+    app_client: TestClient, alice: dict[str, str], bob: dict[str, str]
+) -> None:
+    """Alice's earlier run is NOT bob's prior even when contexts match."""
+
+    app_client.post("/history", json=_bangalore(), headers=alice)
+    bob_id = app_client.post("/history", json=_bangalore(), headers=bob).json()["report_id"]
+    resp = app_client.get(f"/history/{bob_id}/diff", headers=bob)
+    assert resp.status_code == 404

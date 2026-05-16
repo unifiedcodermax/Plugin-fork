@@ -138,3 +138,41 @@ def get_report(
         ValidationReport.user_id == user_id,
     )
     return session.exec(stmt).first()
+
+
+def get_prior_report(
+    session: Session,
+    *,
+    user_id: int,
+    report_id: UUID,
+) -> ValidationReport | None:
+    """Return the most recent earlier report by the same user for the
+    same (city, classification, zone) as ``report_id``.
+
+    This is the 'compare with last save' anchor for the auto-diff
+    endpoint. Same-project here means same project context, not same
+    snapshot_id — every save gets a fresh snapshot_id from the plugin,
+    so identity-by-snapshot wouldn't surface a prior run.
+
+    Returns None when:
+      * report_id doesn't exist (or belongs to another user),
+      * report_id exists but has no earlier run with matching context.
+    """
+
+    target = get_report(session, user_id=user_id, report_id=report_id)
+    if target is None:
+        return None
+
+    stmt = (
+        select(ValidationReport)
+        .where(
+            ValidationReport.user_id == user_id,
+            ValidationReport.city == target.city,
+            ValidationReport.classification == target.classification,
+            ValidationReport.zone == target.zone,
+            ValidationReport.generated_at < target.generated_at,
+        )
+        .order_by(col(ValidationReport.generated_at).desc())
+        .limit(1)
+    )
+    return session.exec(stmt).first()

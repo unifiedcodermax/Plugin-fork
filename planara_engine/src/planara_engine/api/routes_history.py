@@ -1,14 +1,21 @@
-"""/history — persisted validation runs.
+"""/history — persisted validation runs + regression diffs.
 
-POST /history             Evaluate, save, return ArchivalReport JSON.
-GET  /history             List my reports (paginated, filterable).
-GET  /history/{id}        Fetch one archive (JSON).
-GET  /history/{id}/html   Re-render one archive as HTML.
+POST /history                 Evaluate, save, return ArchivalReport JSON.
+GET  /history                 List my reports (paginated, filterable).
+GET  /history/diff            Diff two reports by id (?from=X&to=Y).
+GET  /history/{id}            Fetch one archive (JSON).
+GET  /history/{id}/diff       Diff this report vs the most-recent
+                              prior run with the same (city, classification,
+                              zone) — "compare with my last save".
+GET  /history/{id}/html       Re-render one archive as HTML.
 
 Every read is user-scoped: a JWT user can never see another user's
 report. The repository returns None for both "missing" and
 "belongs to someone else"; this route translates both to 404 so
 the response shape doesn't leak which case it was.
+
+Route declaration order matters: /history/diff is registered BEFORE
+/history/{id} so FastAPI doesn't try to parse "diff" as a UUID.
 """
 
 from __future__ import annotations
@@ -27,11 +34,17 @@ from planara_engine.domain import Snapshot
 from planara_engine.engine import evaluate
 from planara_engine.persistence.reports import (
     count_reports,
+    get_prior_report,
     get_report,
     list_reports,
     save_report,
 )
-from planara_engine.reporting import ArchivalReport, render_archive, render_html
+from planara_engine.reporting import (
+    ArchivalReport,
+    diff_reports,
+    render_archive,
+    render_html,
+)
 
 router = APIRouter(tags=["history"])
 log = get_logger("planara.api.history")
@@ -124,6 +137,39 @@ def list_history(
 
 
 @router.get(
+    "/history/diff",
+    summary="Diff two archived reports (JSON)",
+)
+def diff_history_explicit(
+    user: CurrentUser,
+    session: SessionDep,
+    from_id: Annotated[UUID, Query(alias="from")],
+    to_id: Annotated[UUID, Query(alias="to")],
+) -> dict[str, Any]:
+    """Diff ``from`` (baseline) against ``to`` (current).
+
+    Both must belong to the calling user; either side missing
+    surfaces as 404 — the route can't tell whether the report
+    doesn't exist or just belongs to someone else, and shouldn't.
+    """
+
+    prev_row = get_report(session, user_id=user.id, report_id=from_id)  # type: ignore[arg-type]
+    if prev_row is None:
+        raise NotFound(
+            f"no report with id {from_id}",
+            details={"report_id": str(from_id)},
+        )
+    curr_row = get_report(session, user_id=user.id, report_id=to_id)  # type: ignore[arg-type]
+    if curr_row is None:
+        raise NotFound(
+            f"no report with id {to_id}",
+            details={"report_id": str(to_id)},
+        )
+
+    return _build_diff(prev_row, curr_row)
+
+
+@router.get(
     "/history/{report_id}",
     summary="Fetch one archived report (JSON)",
     response_model=None,
@@ -144,6 +190,46 @@ def get_history(
     # a freshly-rendered archive (the engine state may have moved on
     # since the row was written).
     return JSONResponse(content=json.loads(row.payload))
+
+
+@router.get(
+    "/history/{report_id}/diff",
+    summary="Diff one report against its most-recent prior (same context)",
+)
+def diff_history_vs_prior(
+    report_id: UUID,
+    user: CurrentUser,
+    session: SessionDep,
+) -> dict[str, Any]:
+    """Auto-diff: this report vs the previous run with matching
+    (city, classification, zone) for the same user.
+
+    Returns 404 when the report doesn't exist for this user, OR
+    when no prior run exists for the same project context (a first
+    save has nothing to compare against — that's the 'no prior'
+    case the UI should surface as 'this is your baseline').
+    """
+
+    curr_row = get_report(session, user_id=user.id, report_id=report_id)  # type: ignore[arg-type]
+    if curr_row is None:
+        raise NotFound(
+            f"no report with id {report_id}",
+            details={"report_id": str(report_id)},
+        )
+
+    prev_row = get_prior_report(session, user_id=user.id, report_id=report_id)  # type: ignore[arg-type]
+    if prev_row is None:
+        raise NotFound(
+            "no prior report exists for this project context",
+            details={
+                "report_id": str(report_id),
+                "city": curr_row.city,
+                "classification": curr_row.classification,
+                "zone": curr_row.zone,
+            },
+        )
+
+    return _build_diff(prev_row, curr_row)
 
 
 @router.get(
@@ -191,3 +277,12 @@ def _summary(row: Any) -> dict[str, Any]:
         "rule_pack_version": row.rule_pack_version,
         "generated_at": row.generated_at.isoformat(),
     }
+
+
+def _build_diff(prev_row: Any, curr_row: Any) -> dict[str, Any]:
+    """Load two stored payloads, parse, diff, serialize for JSON."""
+
+    prev_archive = ArchivalReport.model_validate_json(prev_row.payload)
+    curr_archive = ArchivalReport.model_validate_json(curr_row.payload)
+    diff = diff_reports(prev_archive, curr_archive)
+    return diff.model_dump(mode="json")
