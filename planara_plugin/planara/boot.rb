@@ -18,6 +18,7 @@ require_relative 'session'
 require_relative 'engine_client'
 require_relative 'engine_supervisor'
 require_relative 'geometry/extractor'
+require_relative 'observers/live_validator'
 require_relative 'ui/login_dialog'
 
 module Planara
@@ -48,19 +49,29 @@ module Planara
       end
     end
 
-    # Called once a valid JWT is stored in Session. Runs the first
-    # validation manually; observer-driven re-validation is wired
-    # in Sprint 4.
+    # Called once a valid JWT is stored in Session. Captures project
+    # metadata (once), attaches the live-validate observer, and runs
+    # an initial pass so the user sees state immediately.
     def on_authenticated
       Logger.info('authenticated', token_length: Session.token&.length)
-      run_validation_once
+      return unless ensure_project_setup
+      start_live_loop
+      live_validate
     end
 
-    # Demo path until observers arrive: ensure project metadata is
-    # captured, extract a Snapshot, post /validate, render the response.
+    # One-shot validation pass. Used for the initial render after
+    # login and (later) from a menu item. Surfaces extraction errors
+    # via a dialog because this is a user-triggered action.
     def run_validation_once
       ensure_project_setup or return
+      live_validate(noisy: true)
+    end
 
+    # Internal validation step shared between the initial pass and
+    # the live-loop observer. When ``noisy`` is true, extraction/
+    # transport errors pop a dialog; otherwise they only log, so the
+    # observer doesn't spam dialogs during normal editing.
+    def live_validate(noisy: false)
       model = Sketchup.active_model
       snapshot = Geometry::Extractor.extract(
         model: model,
@@ -78,10 +89,37 @@ module Planara
       response = EngineClient.validate(snapshot)
       show_validation_result(response)
     rescue Geometry::Extractor::ExtractionError => e
-      ::UI.messagebox("Could not read the model:\n\n#{e.message}\n\n" \
-                      'Name your plot group "Plot" and floor groups "Floor 0", "Floor 1", etc.')
+      Logger.warn('extract_failed', error: e.message, noisy: noisy)
+      if noisy
+        ::UI.messagebox("Could not read the model:\n\n#{e.message}\n\n" \
+                        'Name your plot group "Plot" and floor groups "Floor 0", "Floor 1", etc.')
+      end
     rescue EngineClient::EngineError => e
-      ::UI.messagebox("Validation failed: #{e.message}")
+      Logger.warn('validate_failed', code: e.code, message: e.message, noisy: noisy)
+      ::UI.messagebox("Validation failed: #{e.message}") if noisy
+    end
+
+    # Live-loop lifecycle -------------------------------------------------
+
+    def start_live_loop
+      return if @live_observer
+
+      model = Sketchup.active_model
+      return unless model
+
+      @live_observer = Observers::LiveValidator.new do
+        next unless Session.authenticated? && Session.project_ready?
+        live_validate(noisy: false)
+      end
+      model.add_observer(@live_observer)
+      Logger.info('live_loop_started')
+    end
+
+    def stop_live_loop
+      return unless @live_observer
+      @live_observer.detach(Sketchup.active_model)
+      @live_observer = nil
+      Logger.info('live_loop_stopped')
     end
 
     # Re-prompt only when Session has no project yet; the live loop
@@ -142,6 +180,7 @@ module Planara
     # below via Sketchup::AppObserver.
     def shutdown
       Logger.info('plugin_shutting_down')
+      stop_live_loop
       EngineSupervisor.stop
       Session.clear
     end
