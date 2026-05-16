@@ -1,0 +1,199 @@
+{
+  "city": "Mumbai",
+  "version": "0.1.0",
+  "rules": [
+    {
+      "id": "mum.fsi.island.residential",
+      "category": "fsi",
+      "applies_when": { "classification": "Island", "zone": "Residential" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.33, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Island City/Residential limit of {max_fsi}. Built-up: {built_up_m2} m² on a {plot_area_m2} m² plot."
+    },
+    {
+      "id": "mum.fsi.island.commercial",
+      "category": "fsi",
+      "applies_when": { "classification": "Island", "zone": "Commercial" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.33, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Island City/Commercial limit of {max_fsi}."
+    },
+    {
+      "id": "mum.fsi.island.industry",
+      "category": "fsi",
+      "applies_when": { "classification": "Island", "zone": "Industry" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.0 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Island City/Industry limit of {max_fsi}."
+    },
+    {
+      "id": "mum.fsi.suburbs.residential",
+      "category": "fsi",
+      "applies_when": { "classification": "Suburbs", "zone": "Residential" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.0, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Suburbs/Residential limit of {max_fsi}."
+    },
+    {
+      "id": "mum.fsi.suburbs.commercial",
+      "category": "fsi",
+      "applies_when": { "classification": "Suburbs", "zone": "Commercial" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.5, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Suburbs/Commercial limit of {max_fsi}."
+    },
+    {
+      "id": "mum.fsi.suburbs.industry",
+      "category": "fsi",
+      "applies_when": { "classification": "Suburbs", "zone": "Industry" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.0 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Suburbs/Industry limit of {max_fsi}."
+    },
+
+    {
+      "id": "mum.setback.island.residential",
+      "category": "setback",
+      "applies_when": { "classification": "Island", "zone": "Residential" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 3.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (Island City/Residential requires {min_setback_m} m)."
+    },
+    {
+      "id": "mum.setback.island.commercial",
+      "category": "setback",
+      "applies_when": { "classification": "Island", "zone": "Commercial" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 4.5 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (Island City/Commercial requires {min_setback_m} m)."
+    },
+    {
+      "id": "mum.setback.island.industry",
+      "category": "setback",
+      "applies_when": { "classification": "Island", "zone": "Industry" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 6.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (Island City/Industry requires {min_setback_m} m)."
+    },
+    {
+      "id": "mum.setback.suburbs.residential",
+      "category": "setback",
+      "applies_when": { "classification": "Suburbs", "zone": "Residential" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 4.5 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (Suburbs/Residential requires {min_setback_m} m)."
+    },
+    {
+      "id": "mum.setback.suburbs.commercial",
+      "category": "setback",
+      "applies_when": { "classification": "Suburbs", "zone": "Commercial" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 6.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (Suburbs/Commercial requires {min_setback_m} m)."
+    },
+    {
+      "id": "mum.setback.suburbs.industry",
+      "category": "setback",
+      "applies_when": { "classification": "Suburbs", "zone": "Industry" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 7.5 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (Suburbs/Industry requires {min_setback_m} m)."
+    },
+
+    {
+      "id": "mum.coverage.residential",
+      "category": "coverage",
+      "applies_when": { "zone": "Residential" },
+      "evaluator": "ground_coverage_pct",
+      "params": { "max_coverage_pct": 50.0 },
+      "severity": "error",
+      "message_template": "Ground coverage {coverage_pct}% exceeds the Residential limit of {max_coverage_pct}%."
+    },
+    {
+      "id": "mum.coverage.commercial",
+      "category": "coverage",
+      "applies_when": { "zone": "Commercial" },
+      "evaluator": "ground_coverage_pct",
+      "params": { "max_coverage_pct": 70.0 },
+      "severity": "error",
+      "message_template": "Ground coverage {coverage_pct}% exceeds the Commercial limit of {max_coverage_pct}%."
+    },
+    {
+      "id": "mum.coverage.industry",
+      "category": "coverage",
+      "applies_when": { "zone": "Industry" },
+      "evaluator": "ground_coverage_pct",
+      "params": { "max_coverage_pct": 60.0 },
+      "severity": "error",
+      "message_template": "Ground coverage {coverage_pct}% exceeds the Industry limit of {max_coverage_pct}%."
+    },
+
+    {
+      "id": "mum.open_space.residential",
+      "category": "open_space",
+      "applies_when": { "zone": "Residential" },
+      "evaluator": "open_space_pct",
+      "params": { "min_open_space_pct": 30.0 },
+      "severity": "error",
+      "message_template": "Open space {open_space_pct}% is below the Residential minimum of {min_open_space_pct}%."
+    },
+    {
+      "id": "mum.open_space.commercial",
+      "category": "open_space",
+      "applies_when": { "zone": "Commercial" },
+      "evaluator": "open_space_pct",
+      "params": { "min_open_space_pct": 20.0 },
+      "severity": "error",
+      "message_template": "Open space {open_space_pct}% is below the Commercial minimum of {min_open_space_pct}%."
+    },
+    {
+      "id": "mum.open_space.industry",
+      "category": "open_space",
+      "applies_when": { "zone": "Industry" },
+      "evaluator": "open_space_pct",
+      "params": { "min_open_space_pct": 25.0 },
+      "severity": "error",
+      "message_template": "Open space {open_space_pct}% is below the Industry minimum of {min_open_space_pct}%."
+    },
+
+    {
+      "id": "mum.parking.residential",
+      "category": "parking",
+      "applies_when": { "zone": "Residential" },
+      "evaluator": "parking_slots_required",
+      "params": { "m2_per_slot": 75.0, "visitor_pct": 10.0 },
+      "severity": "error",
+      "message_template": "Parking: {parking_slots_provided} provided, {parking_slots_required} required ({primary_slots} primary + {visitor_slots} visitor at 1 slot per {m2_per_slot} m²)."
+    },
+    {
+      "id": "mum.parking.commercial",
+      "category": "parking",
+      "applies_when": { "zone": "Commercial" },
+      "evaluator": "parking_slots_required",
+      "params": { "m2_per_slot": 40.0, "visitor_pct": 15.0 },
+      "severity": "error",
+      "message_template": "Parking: {parking_slots_provided} provided, {parking_slots_required} required ({primary_slots} primary + {visitor_slots} visitor at 1 slot per {m2_per_slot} m²)."
+    },
+    {
+      "id": "mum.parking.industry",
+      "category": "parking",
+      "applies_when": { "zone": "Industry" },
+      "evaluator": "parking_slots_required",
+      "params": { "m2_per_slot": 75.0 },
+      "severity": "error",
+      "message_template": "Parking: {parking_slots_provided} provided, {parking_slots_required} required (1 slot per {m2_per_slot} m²)."
+    }
+  ]
+}
