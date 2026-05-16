@@ -7,6 +7,7 @@ triggers registration in production; tests import it directly.
 
 from planara_engine.compliance import coverage  # noqa: F401 — side-effect import
 from planara_engine.compliance import fsi  # noqa: F401 — side-effect import
+from planara_engine.compliance import parking  # noqa: F401 — side-effect import
 from planara_engine.compliance import setback  # noqa: F401 — side-effect import
 
 __all__: list[str] = []
