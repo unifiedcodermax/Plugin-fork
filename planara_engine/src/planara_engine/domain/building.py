@@ -44,16 +44,25 @@ class Floor(BaseModel):
 class Building(BaseModel):
     """The full stack.
 
-    floors:           one entry per floor. Order is not assumed;
-                      the engine sorts by level.
-    total_height_m:   OPTIONAL extractor-provided height. When
-                      omitted, the engine computes
-                      sum(floor.height_m). When present and
-                      inconsistent, the engine logs a warning.
+    floors:                  one entry per floor. Order is not
+                             assumed; the engine sorts by level.
+    total_height_m:          OPTIONAL extractor-provided height.
+                             When omitted, the engine computes
+                             sum(floor.height_m). When present
+                             and inconsistent, the engine logs a
+                             warning.
+    parking_slots_provided:  number of on-site parking slots the
+                             user reports the design provides.
+                             Compared against per-byelaw demand
+                             by the parking evaluator. 0 (the
+                             default) means "no parking";
+                             evaluators that don't apply leave it
+                             alone.
     """
 
     floors: list[Floor] = Field(min_length=1)
     total_height_m: float | None = Field(default=None, gt=0.0)
+    parking_slots_provided: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def _unique_levels(self) -> Building:

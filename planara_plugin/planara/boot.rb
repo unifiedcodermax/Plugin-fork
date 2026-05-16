@@ -59,15 +59,20 @@ module Planara
     # Demo path until observers arrive: prompt for project metadata,
     # extract a Snapshot, post /validate, render the response.
     def run_validation_once
-      project = prompt_project_setup
+      project, parking_slots = prompt_project_setup
       return unless project
 
       model = Sketchup.active_model
-      snapshot = Geometry::Extractor.extract(model: model, project: project)
+      snapshot = Geometry::Extractor.extract(
+        model: model,
+        project: project,
+        parking_slots: parking_slots
+      )
       Logger.info(
         'snapshot_extracted',
         floors: snapshot[:building][:floors].length,
-        plot_area_m2: snapshot[:plot][:area_m2]&.round(2)
+        plot_area_m2: snapshot[:plot][:area_m2]&.round(2),
+        parking_slots: snapshot[:building][:parking_slots_provided]
       )
 
       response = EngineClient.post('/validate', snapshot)
@@ -80,12 +85,19 @@ module Planara
     end
 
     def prompt_project_setup
-      prompts  = ['City', 'Classification (Heritage / CBD / HDZ)', 'Zone (Residential / Commercial / Industry)']
-      defaults = ['Bangalore', 'CBD', 'Residential']
+      prompts = [
+        'City',
+        'Classification (Heritage / CBD / HDZ)',
+        'Zone (Residential / Commercial / Industry)',
+        'Parking slots provided'
+      ]
+      defaults = ['Bangalore', 'CBD', 'Residential', '0']
       input = ::UI.inputbox(prompts, defaults, 'Planara — Project setup')
-      return nil unless input
+      return [nil, 0] unless input
 
-      { city: input[0], classification: input[1], zone: input[2] }
+      project = { city: input[0], classification: input[1], zone: input[2] }
+      parking = input[3].to_i
+      [project, parking]
     end
 
     def show_validation_result(response)

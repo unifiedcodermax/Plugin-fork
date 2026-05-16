@@ -101,6 +101,28 @@ def test_building_requires_at_least_one_floor() -> None:
         Building(floors=[])
 
 
+def test_building_parking_slots_default_zero() -> None:
+    b = Building(floors=[Floor(level=0, polygon=_square(), height_m=3.0)])
+    assert b.parking_slots_provided == 0
+
+
+def test_building_parking_slots_must_be_non_negative() -> None:
+    with pytest.raises(ValidationError):
+        Building(
+            floors=[Floor(level=0, polygon=_square(), height_m=3.0)],
+            parking_slots_provided=-1,
+        )
+
+
+def test_building_parking_slots_round_trips_through_json() -> None:
+    b = Building(
+        floors=[Floor(level=0, polygon=_square(), height_m=3.0)],
+        parking_slots_provided=12,
+    )
+    restored = Building.model_validate_json(b.model_dump_json())
+    assert restored.parking_slots_provided == 12
+
+
 # ---- Snapshot ----------------------------------------------------------------
 
 

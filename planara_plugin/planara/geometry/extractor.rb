@@ -48,8 +48,10 @@ module Planara
       # @param model [Sketchup::Model]
       # @param project [Hash] { city:, classification:, zone: } pulled
       #   from the project-setup dialog.
+      # @param parking_slots [Integer] number of slots the user reports
+      #   the design provides. Surfaced to the parking evaluator.
       # @return [Hash] the JSON-ready Snapshot payload.
-      def extract(model:, project:)
+      def extract(model:, project:, parking_slots: 0)
         raise ExtractionError, 'no active model' unless model
 
         plot = find_plot(model)
@@ -69,7 +71,10 @@ module Planara
             polygon: { exterior: plot_polygon[:exterior] },
             area_m2: plot_polygon[:area_m2],
           },
-          building: { floors: floor_payloads },
+          building: {
+            floors: floor_payloads,
+            parking_slots_provided: parking_slots.to_i,
+          },
         }
       end
 
