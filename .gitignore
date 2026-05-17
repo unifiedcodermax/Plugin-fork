@@ -48,3 +48,4 @@ env/
 # Engine runtime artifacts
 planara_engine/.run/
 planara_engine/instance/
+formatted-history.json
