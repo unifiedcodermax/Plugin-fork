@@ -13,7 +13,7 @@ from planara_engine.domain import (
     Floor,
     Plot,
     Polygon,
-    Project,
+    ProjectContext,
     Snapshot,
 )
 from planara_engine.engine import registry
@@ -41,7 +41,7 @@ def _snap(
     """floors = [(level, height_m)]"""
 
     return Snapshot(
-        project=Project(city="X", classification="CBD", zone="Commercial"),
+        project=ProjectContext(city="X", classification="CBD", zone="Commercial"),
         plot=Plot(polygon=_square(20.0)),
         building=Building(
             floors=[

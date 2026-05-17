@@ -27,7 +27,7 @@ class Applicability(BaseModel):
     classification in the rule's city.
 
     ``overlay`` is the Sprint-5 addition. When set, the rule fires
-    only when ``Project.overlays`` contains that overlay key.
+    only when ``ProjectContext.overlays`` contains that overlay key.
     Overlay rules fire IN ADDITION to base rules (the matcher does
     not exclude either side); to override a base limit, ship an
     overlay rule with a stricter param value and a distinct
@@ -70,7 +70,7 @@ class Rule(BaseModel):
 class RulePack(BaseModel):
     """A versioned bundle of rules for one city.
 
-    city:    must match Project.city for rules to apply.
+    city:    must match ProjectContext.city for rules to apply.
     version: SemVer-ish string. Stored on the response metrics
              so a user can verify which pack was used.
     rules:   the rules. Duplicate ids are rejected at load time.

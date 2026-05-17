@@ -14,7 +14,7 @@ from planara_engine.domain import (
     Floor,
     Plot,
     Polygon,
-    Project,
+    ProjectContext,
     Severity,
     Snapshot,
     ValidationResponse,
@@ -37,7 +37,7 @@ def _square(size: float, ox: float = 0.0, oy: float = 0.0) -> Polygon:
 
 def _snap(**project_overrides) -> Snapshot:
     return Snapshot(
-        project=Project(
+        project=ProjectContext(
             city=project_overrides.get("city", "Bangalore"),
             classification=project_overrides.get("classification", "CBD"),
             zone=project_overrides.get("zone", "Residential"),

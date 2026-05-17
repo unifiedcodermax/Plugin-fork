@@ -13,7 +13,7 @@ from planara_engine.domain import (
     Floor,
     Plot,
     Polygon,
-    Project,
+    ProjectContext,
     Snapshot,
 )
 from planara_engine.engine import registry
@@ -53,7 +53,7 @@ def _snap(plot_size: float, ground_polys: list[Polygon], extra_floors: list[Floo
         # Building requires >=1 floor — add a placeholder above grade.
         floors = [Floor(level=1, polygon=_sq(1.0), height_m=3.0)]
     return Snapshot(
-        project=Project(city="X", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="X", classification="CBD", zone="Residential"),
         plot=Plot(polygon=_sq(plot_size)),
         building=Building(floors=floors),
     )
@@ -93,7 +93,7 @@ def test_coverage_exactly_at_limit_passes() -> None:
     # 10x14.142... -> exactly 50% of 400 = 200. Use a 10x20 strip = 50%.
     # Plot 20x20, build 10x20 -> 200/400 = 50% exactly.
     snap = Snapshot(
-        project=Project(city="X", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="X", classification="CBD", zone="Residential"),
         plot=Plot(polygon=_sq(20.0)),
         building=Building(
             floors=[
@@ -114,7 +114,7 @@ def test_coverage_exactly_at_limit_passes() -> None:
 def test_coverage_no_ground_floor_returns_zero_coverage() -> None:
     # Building with floors above grade but no level==0 -> coverage 0%.
     snap = Snapshot(
-        project=Project(city="X", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="X", classification="CBD", zone="Residential"),
         plot=Plot(polygon=_sq(20.0)),
         building=Building(
             floors=[Floor(level=1, polygon=_sq(15.0), height_m=3.0)]
@@ -160,7 +160,7 @@ def test_open_space_fails_below_min() -> None:
 
 def test_open_space_with_no_ground_floor_is_100() -> None:
     snap = Snapshot(
-        project=Project(city="X", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="X", classification="CBD", zone="Residential"),
         plot=Plot(polygon=_sq(20.0)),
         building=Building(
             floors=[Floor(level=1, polygon=_sq(15.0), height_m=3.0)]
@@ -197,7 +197,7 @@ def test_collinear_plot_rejected_by_geometry_layer() -> None:
     # Polygon. This pins the failure boundary: the evaluator can
     # assume its inputs already passed shape validation.
     snap = Snapshot(
-        project=Project(city="X", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="X", classification="CBD", zone="Residential"),
         plot=Plot(polygon=Polygon(exterior=[[0, 0], [1, 0], [2, 0], [3, 0]])),
         building=Building(
             floors=[Floor(level=0, polygon=_sq(10.0), height_m=3.0)]

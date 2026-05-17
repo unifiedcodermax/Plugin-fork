@@ -9,7 +9,7 @@ from planara_engine.domain import (
     Floor,
     Plot,
     Polygon,
-    Project,
+    ProjectContext,
     Severity,
     Snapshot,
     ValidationResponse,
@@ -35,7 +35,7 @@ def _square(size: float, ox: float = 0.0, oy: float = 0.0) -> Polygon:
 
 def _snap() -> Snapshot:
     return Snapshot(
-        project=Project(city="Bangalore", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="Bangalore", classification="CBD", zone="Residential"),
         plot=Plot(polygon=_square(50.0)),
         building=Building(
             floors=[Floor(level=0, polygon=_square(10.0, 20.0, 20.0), height_m=3.0)],

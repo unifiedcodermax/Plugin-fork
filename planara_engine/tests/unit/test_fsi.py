@@ -13,7 +13,7 @@ from planara_engine.domain import (
     Floor,
     Plot,
     Polygon,
-    Project,
+    ProjectContext,
     Severity,
     Snapshot,
 )
@@ -44,7 +44,7 @@ def _snap(floors: list[tuple[int, float, float, bool]], plot_size: float = 20.0)
     """floors = [(level, footprint_size, height, is_habitable)]"""
 
     return Snapshot(
-        project=Project(city="Testopolis", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="Testopolis", classification="CBD", zone="Residential"),
         plot=Plot(polygon=_square(plot_size)),
         building=Building(
             floors=[
