@@ -43,6 +43,7 @@ from planara_engine.reporting import (
     ArchivalReport,
     diff_reports,
     render_archive,
+    render_diff_html,
     render_html,
 )
 
@@ -153,20 +154,23 @@ def diff_history_explicit(
     doesn't exist or just belongs to someone else, and shouldn't.
     """
 
-    prev_row = get_report(session, user_id=user.id, report_id=from_id)  # type: ignore[arg-type]
-    if prev_row is None:
-        raise NotFound(
-            f"no report with id {from_id}",
-            details={"report_id": str(from_id)},
-        )
-    curr_row = get_report(session, user_id=user.id, report_id=to_id)  # type: ignore[arg-type]
-    if curr_row is None:
-        raise NotFound(
-            f"no report with id {to_id}",
-            details={"report_id": str(to_id)},
-        )
-
+    prev_row, curr_row = _load_diff_pair(session, user.id, from_id, to_id)  # type: ignore[arg-type]
     return _build_diff(prev_row, curr_row)
+
+
+@router.get(
+    "/history/diff/html",
+    summary="Diff two archived reports (HTML)",
+    response_model=None,
+)
+def diff_history_explicit_html(
+    user: CurrentUser,
+    session: SessionDep,
+    from_id: Annotated[UUID, Query(alias="from")],
+    to_id: Annotated[UUID, Query(alias="to")],
+) -> HTMLResponse:
+    prev_row, curr_row = _load_diff_pair(session, user.id, from_id, to_id)  # type: ignore[arg-type]
+    return HTMLResponse(content=_build_diff_html(prev_row, curr_row), status_code=200)
 
 
 @router.get(
@@ -210,26 +214,22 @@ def diff_history_vs_prior(
     case the UI should surface as 'this is your baseline').
     """
 
-    curr_row = get_report(session, user_id=user.id, report_id=report_id)  # type: ignore[arg-type]
-    if curr_row is None:
-        raise NotFound(
-            f"no report with id {report_id}",
-            details={"report_id": str(report_id)},
-        )
-
-    prev_row = get_prior_report(session, user_id=user.id, report_id=report_id)  # type: ignore[arg-type]
-    if prev_row is None:
-        raise NotFound(
-            "no prior report exists for this project context",
-            details={
-                "report_id": str(report_id),
-                "city": curr_row.city,
-                "classification": curr_row.classification,
-                "zone": curr_row.zone,
-            },
-        )
-
+    prev_row, curr_row = _load_prior_pair(session, user.id, report_id)  # type: ignore[arg-type]
     return _build_diff(prev_row, curr_row)
+
+
+@router.get(
+    "/history/{report_id}/diff/html",
+    summary="Diff one report against its most-recent prior (HTML)",
+    response_model=None,
+)
+def diff_history_vs_prior_html(
+    report_id: UUID,
+    user: CurrentUser,
+    session: SessionDep,
+) -> HTMLResponse:
+    prev_row, curr_row = _load_prior_pair(session, user.id, report_id)  # type: ignore[arg-type]
+    return HTMLResponse(content=_build_diff_html(prev_row, curr_row), status_code=200)
 
 
 @router.get(
@@ -282,7 +282,61 @@ def _summary(row: Any) -> dict[str, Any]:
 def _build_diff(prev_row: Any, curr_row: Any) -> dict[str, Any]:
     """Load two stored payloads, parse, diff, serialize for JSON."""
 
+    return _diff_pair(prev_row, curr_row).model_dump(mode="json")
+
+
+def _build_diff_html(prev_row: Any, curr_row: Any) -> str:
+    """Load two stored payloads, parse, diff, render to HTML."""
+
+    return render_diff_html(_diff_pair(prev_row, curr_row))
+
+
+def _diff_pair(prev_row: Any, curr_row: Any):
     prev_archive = ArchivalReport.model_validate_json(prev_row.payload)
     curr_archive = ArchivalReport.model_validate_json(curr_row.payload)
-    diff = diff_reports(prev_archive, curr_archive)
-    return diff.model_dump(mode="json")
+    return diff_reports(prev_archive, curr_archive)
+
+
+def _load_diff_pair(
+    session: Any, user_id: int, from_id: UUID, to_id: UUID
+) -> tuple[Any, Any]:
+    """Load two reports user-scoped. Either missing -> 404."""
+
+    prev_row = get_report(session, user_id=user_id, report_id=from_id)
+    if prev_row is None:
+        raise NotFound(
+            f"no report with id {from_id}",
+            details={"report_id": str(from_id)},
+        )
+    curr_row = get_report(session, user_id=user_id, report_id=to_id)
+    if curr_row is None:
+        raise NotFound(
+            f"no report with id {to_id}",
+            details={"report_id": str(to_id)},
+        )
+    return prev_row, curr_row
+
+
+def _load_prior_pair(
+    session: Any, user_id: int, report_id: UUID
+) -> tuple[Any, Any]:
+    """Load (prior, curr) for the auto-diff endpoint."""
+
+    curr_row = get_report(session, user_id=user_id, report_id=report_id)
+    if curr_row is None:
+        raise NotFound(
+            f"no report with id {report_id}",
+            details={"report_id": str(report_id)},
+        )
+    prev_row = get_prior_report(session, user_id=user_id, report_id=report_id)
+    if prev_row is None:
+        raise NotFound(
+            "no prior report exists for this project context",
+            details={
+                "report_id": str(report_id),
+                "city": curr_row.city,
+                "classification": curr_row.classification,
+                "zone": curr_row.zone,
+            },
+        )
+    return prev_row, curr_row

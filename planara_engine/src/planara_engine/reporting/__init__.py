@@ -22,6 +22,7 @@ from planara_engine.reporting.diff import (
     ViolationDiff,
     diff_reports,
 )
+from planara_engine.reporting.diff_html import render_diff_html
 from planara_engine.reporting.html_renderer import render_html
 
 __all__ = [
@@ -34,5 +35,6 @@ __all__ = [
     "ViolationDiff",
     "diff_reports",
     "render_archive",
+    "render_diff_html",
     "render_html",
 ]

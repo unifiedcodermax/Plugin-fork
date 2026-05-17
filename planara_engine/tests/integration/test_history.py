@@ -490,3 +490,57 @@ def test_auto_diff_user_scoped(
     bob_id = app_client.post("/history", json=_bangalore(), headers=bob).json()["report_id"]
     resp = app_client.get(f"/history/{bob_id}/diff", headers=bob)
     assert resp.status_code == 404
+
+
+# ---- HTML diff routes --------------------------------------------------------
+
+
+def test_diff_explicit_html_renders_regression(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    pass_id = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+    fail_id = _save_failing(app_client, alice)
+
+    resp = app_client.get(
+        f"/history/diff/html?from={pass_id}&to={fail_id}", headers=alice
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/html")
+    body = resp.text
+    assert "<!DOCTYPE html>" in body
+    assert "REGRESSED" in body
+    assert "blr.fsi.cbd.residential" in body
+
+
+def test_diff_explicit_html_unknown_id_returns_404(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    rid = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+    fake = "00000000-0000-0000-0000-000000000000"
+    resp = app_client.get(f"/history/diff/html?from={fake}&to={rid}", headers=alice)
+    assert resp.status_code == 404
+
+
+def test_auto_diff_html_renders_for_second_save(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    app_client.post("/history", json=_bangalore(), headers=alice)
+    second = _save_failing(app_client, alice)
+    resp = app_client.get(f"/history/{second}/diff/html", headers=alice)
+    assert resp.status_code == 200
+    assert "<!DOCTYPE html>" in resp.text
+    assert "REGRESSED" in resp.text
+
+
+def test_auto_diff_html_returns_404_when_no_prior(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    rid = app_client.post("/history", json=_bangalore(), headers=alice).json()["report_id"]
+    resp = app_client.get(f"/history/{rid}/diff/html", headers=alice)
+    assert resp.status_code == 404
+
+
+def test_diff_html_requires_auth(app_client: TestClient) -> None:
+    fake = "00000000-0000-0000-0000-000000000000"
+    resp = app_client.get(f"/history/diff/html?from={fake}&to={fake}")
+    assert resp.status_code == 401

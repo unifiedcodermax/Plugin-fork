@@ -21,6 +21,7 @@ from planara_engine.reporting import (
     Verdict,
     diff_reports,
     render_archive,
+    render_diff_html,
 )
 
 
@@ -241,3 +242,94 @@ def test_violation_ordering_prev_first_then_curr_added() -> None:
     rule_ids = [vd.rule_id for vd in d.violations]
     # prev order: p1 (unchanged), p2 (changed); then curr-only: c-only.
     assert rule_ids == ["p1", "p2", "c-only"]
+
+
+# ---- HTML diff renderer ------------------------------------------------------
+
+
+def test_diff_html_renders_doctype_and_title() -> None:
+    d = diff_reports(_arc(), _arc())
+    html = render_diff_html(d)
+    assert "<!DOCTYPE html>" in html
+    assert "Planara regression report" in html
+    assert "Regression report" in html
+
+
+def test_diff_html_verdict_banner_matches_overall() -> None:
+    # Regressed: a new violation in curr.
+    d = diff_reports(_arc(), _arc(_v("r")))
+    html = render_diff_html(d)
+    assert "REGRESSED" in html
+    assert 'class="verdict fail"' in html
+
+    # Improved: a violation went away.
+    d = diff_reports(_arc(_v("r")), _arc())
+    html = render_diff_html(d)
+    assert "IMPROVED" in html
+    assert 'class="verdict ok"' in html
+
+    # Unchanged.
+    d = diff_reports(_arc(), _arc())
+    html = render_diff_html(d)
+    assert "UNCHANGED" in html
+    assert 'class="verdict neutral"' in html
+
+
+def test_diff_html_summary_shows_each_count() -> None:
+    """Summary grid carries all four statuses, even when zero."""
+
+    d = diff_reports(_arc(_v("p1"), _v("p2")), _arc(_v("p1"), _v("c1")))
+    html = render_diff_html(d)
+    assert "Added" in html
+    assert "Removed" in html
+    assert "Changed" in html
+    assert "Unchanged" in html
+
+
+def test_diff_html_groups_violations_by_status_in_order() -> None:
+    """Order: added (most actionable) -> removed -> changed -> unchanged."""
+
+    d = diff_reports(_arc(_v("u")), _arc(_v("u"), _v("a")))
+    html = render_diff_html(d)
+    added_idx = html.find("Added (1)")
+    unchanged_idx = html.find("Unchanged (1)")
+    assert added_idx != -1
+    assert unchanged_idx != -1
+    assert added_idx < unchanged_idx
+
+
+def test_diff_html_escapes_rule_id_and_message() -> None:
+    """No XSS via injected fields."""
+
+    p = _v("<script>", message="prev <b>m</b>")
+    c = _v("<script>", message="curr <i>m</i>", computed={"x": 1})
+    d = diff_reports(_arc(p), _arc(c))
+    html = render_diff_html(d)
+    assert "<script>" not in html
+    assert "&lt;script&gt;" in html
+    assert "<b>m</b>" not in html
+    assert "&lt;b&gt;m&lt;/b&gt;" in html
+
+
+def test_diff_html_metrics_section_shows_deltas() -> None:
+    prev = _arc(metrics={"fsi": 2.0})
+    curr = _arc(metrics={"fsi": 2.4})
+    d = diff_reports(prev, curr)
+    html = render_diff_html(d)
+    assert "fsi" in html
+    # Numeric delta formatted with sign.
+    assert "+0.4" in html
+
+
+def test_diff_html_empty_metrics_renders_none() -> None:
+    d = diff_reports(_arc(metrics={"a": 1}), _arc(metrics={"a": 1}))
+    html = render_diff_html(d)
+    assert "No metric changes" in html
+
+
+def test_diff_html_missing_side_renders_dash() -> None:
+    """Added/removed rows show '—' for the absent side."""
+
+    d = diff_reports(_arc(), _arc(_v("r")))
+    html = render_diff_html(d)
+    assert "<span class=\"missing\">—</span>" in html
