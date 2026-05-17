@@ -65,19 +65,64 @@ module Planara
       post('/validate', snapshot, authenticated: true)
     end
 
+    # -- /projects ---------------------------------------------------------
+
+    # POST /projects — create a user-named regression-tracking
+    # anchor. The engine enforces per-user name uniqueness; a
+    # collision surfaces as EngineError with status: 409. The UI
+    # layer maps that into a re-prompt or "select existing" flow.
+    def create_project(name:, city:, classification:, zone:)
+      post('/projects', {
+        name: name,
+        city: city,
+        classification: classification,
+        zone: zone,
+      })
+    end
+
+    # GET /projects — paginated, most-recent-first list of the
+    # calling user's projects. Returns the envelope verbatim
+    # ({"items": [...], "limit": ..., "offset": ...}) so the picker
+    # can render the page header alongside the rows.
+    def list_projects(limit: 100, offset: 0)
+      get(with_query('/projects', limit: limit, offset: offset))
+    end
+
+    # GET /projects/{id} — fetch one project by id. Returns the
+    # ProjectResponse body. Used by the picker to confirm a stored
+    # selection still exists (and still belongs to this user) after
+    # a SketchUp restart.
+    def get_project(project_id)
+      get("/projects/#{url_segment(project_id)}")
+    end
+
     # -- /history ----------------------------------------------------------
 
     # POST /history — evaluate snapshot, persist, return the
     # ArchivalReport JSON (includes report_id).
-    def save_history(snapshot)
-      post('/history', snapshot)
+    #
+    # When ``project_id`` is supplied the engine stamps the row with
+    # the project so subsequent auto-diff calls anchor on it. nil
+    # falls back to context-matching (the legacy lane) — used when
+    # the user hasn't picked a project yet.
+    def save_history(snapshot, project_id: nil)
+      path = project_id ? with_query('/history', project_id: project_id) : '/history'
+      post(path, snapshot)
     end
 
     # GET /history — paginated list of the calling user's reports.
     # All filter args are optional; nil values are dropped from the
     # query string so the engine applies its defaults.
-    def list_history(limit: 20, offset: 0, city: nil, classification: nil, zone: nil, ok: nil)
-      params = { limit: limit, offset: offset, city: city, classification: classification, zone: zone, ok: ok }
+    def list_history(limit: 20, offset: 0, project_id: nil, city: nil, classification: nil, zone: nil, ok: nil)
+      params = {
+        limit: limit,
+        offset: offset,
+        project_id: project_id,
+        city: city,
+        classification: classification,
+        zone: zone,
+        ok: ok,
+      }
       get(with_query('/history', params))
     end
 

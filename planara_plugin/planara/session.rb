@@ -21,6 +21,7 @@ module Planara
     def clear
       @token = nil
       @project = nil
+      @project_id = nil
       @last_report_id = nil
     end
 
@@ -60,6 +61,54 @@ module Planara
 
     def last_report_id=(value)
       @last_report_id = value
+    end
+
+    # Currently-selected Project id on the engine side. Threaded
+    # through save_history / list_history so this session's runs
+    # are anchored to one regression-tracking lane.
+    #
+    # Persisted per-SketchUp-model via the model's attribute
+    # dictionary (see ``load_project_id_from_model`` /
+    # ``store_project_id_on_model``) so reopening a .skp picks up
+    # the same anchor automatically. nil means "no project
+    # selected yet" — saves still work, they just stay in the
+    # legacy NULL lane on the engine.
+    def project_id
+      @project_id
+    end
+
+    def project_id=(value)
+      @project_id = value
+    end
+
+    # SketchUp model attribute dictionary name. Scoped under
+    # 'Planara' so we don't collide with the user's own custom
+    # attributes, and keyed by 'project_id' inside that dict.
+    MODEL_ATTR_DICT = 'Planara'
+    MODEL_ATTR_PROJECT_ID = 'project_id'
+
+    # Read a previously-stored project_id off ``model``. Returns
+    # nil when the model has never been associated with a project
+    # (or the dictionary is missing). Defensive against models
+    # that store the id as a string instead of an int — the
+    # engine accepts both via FastAPI's Query coercion, but we
+    # prefer ints internally.
+    def load_project_id_from_model(model)
+      return nil unless model
+      raw = model.get_attribute(MODEL_ATTR_DICT, MODEL_ATTR_PROJECT_ID, nil)
+      return nil if raw.nil?
+      Integer(raw)
+    rescue ArgumentError, TypeError
+      nil
+    end
+
+    # Persist ``id`` on ``model``'s attribute dictionary so future
+    # opens of this .skp restore the same project anchor. Pass nil
+    # to clear the stored id (the picker uses this when the user
+    # explicitly unsets the project).
+    def store_project_id_on_model(model, id)
+      return unless model
+      model.set_attribute(MODEL_ATTR_DICT, MODEL_ATTR_PROJECT_ID, id)
     end
   end
 end

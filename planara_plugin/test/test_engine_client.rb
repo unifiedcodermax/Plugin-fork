@@ -260,5 +260,173 @@ module Planara
         assert_equal(502, err.status)
       end
     end
+
+    # -- /projects -------------------------------------------------------
+    #
+    # The plugin's project picker leans on these three endpoints —
+    # any URL / verb / body drift here breaks the picker silently.
+    # The tests stub the transport so we can assert path + payload
+    # without booting the engine.
+
+    def test_create_project_posts_payload_and_returns_row
+      row = { 'id' => 42, 'name' => '5th Main', 'city' => 'Bangalore',
+              'classification' => 'CBD', 'zone' => 'Residential',
+              'created_at' => '2026-05-17T00:00:00Z' }
+      fake = FakeHttp.new(status: 201, body: JSON.generate(row))
+
+      with_fake(fake) do
+        result = EngineClient.create_project(
+          name: '5th Main',
+          city: 'Bangalore',
+          classification: 'CBD',
+          zone: 'Residential',
+        )
+        assert_equal(row, result)
+      end
+
+      req = fake.captured
+      assert_equal('POST', req.method)
+      assert_equal('/projects', captured_uri.path)
+      assert_equal('application/json', req['Content-Type'])
+      assert_equal('Bearer test-token', req['Authorization'])
+      body = JSON.parse(req.body)
+      assert_equal('5th Main', body['name'])
+      assert_equal('Bangalore', body['city'])
+      assert_equal('CBD', body['classification'])
+      assert_equal('Residential', body['zone'])
+    end
+
+    def test_create_project_propagates_409_conflict
+      # Picker's UI relies on status: 409 to re-prompt; the error
+      # envelope's details.name carries the offending value.
+      err_body = JSON.generate({
+        'error' => {
+          'code' => 'conflict',
+          'message' => "a project named 'dup' already exists",
+          'details' => { 'name' => 'dup' },
+        },
+      })
+      fake = FakeHttp.new(status: 409, body: err_body)
+
+      with_fake(fake) do
+        err = assert_raises(EngineClient::EngineError) do
+          EngineClient.create_project(
+            name: 'dup', city: 'x', classification: 'y', zone: 'z',
+          )
+        end
+        assert_equal(409, err.status)
+        assert_equal('conflict', err.code)
+        assert_equal({ 'name' => 'dup' }, err.details)
+      end
+    end
+
+    def test_list_projects_pagination_defaults
+      fake = FakeHttp.new(status: 200, body: JSON.generate({ 'items' => [], 'limit' => 100, 'offset' => 0 }))
+
+      with_fake(fake) do
+        EngineClient.list_projects
+      end
+
+      assert_equal('/projects', captured_uri.path)
+      query = captured_uri.query
+      # Defaults match the route's _DEFAULT_LIMIT / _MAX_LIMIT.
+      assert_match(/limit=100/, query)
+      assert_match(/offset=0/, query)
+    end
+
+    def test_list_projects_respects_explicit_pagination
+      fake = FakeHttp.new(status: 200, body: JSON.generate({ 'items' => [] }))
+
+      with_fake(fake) do
+        EngineClient.list_projects(limit: 25, offset: 50)
+      end
+
+      query = captured_uri.query
+      assert_match(/limit=25/, query)
+      assert_match(/offset=50/, query)
+    end
+
+    def test_get_project_hits_per_id_path
+      row = { 'id' => 7, 'name' => 'mine', 'city' => 'a',
+              'classification' => 'b', 'zone' => 'c',
+              'created_at' => '2026-05-17T00:00:00Z' }
+      fake = FakeHttp.new(status: 200, body: JSON.generate(row))
+
+      with_fake(fake) do
+        assert_equal(row, EngineClient.get_project(7))
+      end
+
+      assert_equal('/projects/7', captured_uri.path)
+      assert_equal('GET', fake.captured.method)
+      assert_equal('Bearer test-token', fake.captured['Authorization'])
+    end
+
+    def test_get_project_translates_404
+      # ensure_project_selected uses 404 as the "stored id is
+      # stale" signal — it must come through as e.status == 404.
+      err_body = JSON.generate({ 'error' => { 'code' => 'not_found', 'message' => 'gone' } })
+      fake = FakeHttp.new(status: 404, body: err_body)
+
+      with_fake(fake) do
+        err = assert_raises(EngineClient::EngineError) { EngineClient.get_project(99999) }
+        assert_equal(404, err.status)
+        assert_equal('not_found', err.code)
+      end
+    end
+
+    # -- project_id threading on /history endpoints ----------------------
+
+    def test_save_history_threads_project_id_when_present
+      archive = { 'report_id' => 'r1', 'response' => { 'ok' => true } }
+      fake = FakeHttp.new(status: 201, body: JSON.generate(archive))
+
+      with_fake(fake) do
+        EngineClient.save_history({ snapshot_id: 'u' }, project_id: 42)
+      end
+
+      req = fake.captured
+      assert_equal('POST', req.method)
+      assert_equal('/history', captured_uri.path)
+      # Engine reads project_id as a Query param, not a body field.
+      assert_equal('project_id=42', captured_uri.query)
+    end
+
+    def test_save_history_omits_project_id_when_nil
+      archive = { 'report_id' => 'r1', 'response' => { 'ok' => true } }
+      fake = FakeHttp.new(status: 201, body: JSON.generate(archive))
+
+      with_fake(fake) do
+        # Legacy/explicit no-anchor save.
+        EngineClient.save_history({ snapshot_id: 'u' })
+      end
+
+      # No ?project_id=… — engine falls into the NULL legacy lane.
+      assert_nil(captured_uri.query)
+      assert_equal('/history', captured_uri.path)
+    end
+
+    def test_list_history_threads_project_id_into_query
+      fake = FakeHttp.new(status: 200, body: JSON.generate({ 'items' => [], 'total' => 0 }))
+
+      with_fake(fake) do
+        EngineClient.list_history(project_id: 7)
+      end
+
+      query = captured_uri.query
+      assert_match(/project_id=7/, query)
+    end
+
+    def test_list_history_drops_nil_project_id
+      # When the picker hasn't been used yet, project_id is nil —
+      # the query must NOT include "project_id=" so the engine
+      # doesn't try to parse the empty/None string.
+      fake = FakeHttp.new(status: 200, body: JSON.generate({ 'items' => [], 'total' => 0 }))
+
+      with_fake(fake) do
+        EngineClient.list_history
+      end
+
+      refute_match(/project_id=/, captured_uri.query)
+    end
   end
 end

@@ -22,6 +22,7 @@ require_relative 'observers/live_validator'
 require_relative 'ui/browser_view'
 require_relative 'ui/history_dialog'
 require_relative 'ui/login_dialog'
+require_relative 'ui/project_picker'
 require_relative 'ui/results_dialog'
 
 module Planara
@@ -58,6 +59,7 @@ module Planara
     def on_authenticated
       Logger.info('authenticated', token_length: Session.token&.length)
       return unless ensure_project_setup
+      ensure_project_selected
       UI::ResultsDialog.show
       start_live_loop
       live_validate
@@ -78,14 +80,20 @@ module Planara
     # and "Open last report" know what to point at.
     def save_current_run
       return unless authenticated_and_set_up?
+      ensure_project_selected
 
       snapshot = extract_snapshot
       return unless snapshot
 
-      archive = EngineClient.save_history(snapshot)
+      archive = EngineClient.save_history(snapshot, project_id: Session.project_id)
       report_id = archive['report_id']
       Session.last_report_id = report_id
-      Logger.info('history_saved', report_id: report_id, ok: archive['response']&.dig('ok'))
+      Logger.info(
+        'history_saved',
+        report_id: report_id,
+        project_id: Session.project_id,
+        ok: archive['response']&.dig('ok'),
+      )
       ::UI.messagebox("Saved. report_id: #{report_id[0, 8]}…")
     rescue Geometry::Extractor::ExtractionError => e
       ::UI.messagebox("Could not save: #{e.message}")
@@ -106,11 +114,12 @@ module Planara
     # things better or worse?" affordance.
     def compare_with_last_save
       return unless authenticated_and_set_up?
+      ensure_project_selected
 
       snapshot = extract_snapshot
       return unless snapshot
 
-      archive = EngineClient.save_history(snapshot)
+      archive = EngineClient.save_history(snapshot, project_id: Session.project_id)
       report_id = archive['report_id']
       Session.last_report_id = report_id
 
@@ -239,6 +248,62 @@ module Planara
       true
     end
 
+    # Make sure a regression-tracking project_id is selected for
+    # this SketchUp session. Lookup order:
+    #   1. Already on Session (set earlier in this session).
+    #   2. Stored on the active model's attribute dictionary (a
+    #      previously-saved .skp remembering its anchor).
+    #   3. Prompt the user via ProjectPicker.
+    #
+    # Idempotent. Returns the chosen id or nil if the user cancels
+    # the picker — callers can proceed without an anchor (saves
+    # still work; they just stay in the legacy lane).
+    def ensure_project_selected
+      return Session.project_id if Session.project_id
+
+      model = Sketchup.active_model
+      stored = Session.load_project_id_from_model(model)
+      if stored
+        # Trust-but-verify: a stored id from an older session might
+        # point at a project the user since deleted (or worse, one
+        # that now belongs to a different account). Confirm via
+        # get_project; on 404, fall through to the picker rather
+        # than carry a dangling reference.
+        begin
+          EngineClient.get_project(stored)
+          Session.project_id = stored
+          Logger.info('project_id_restored_from_model', project_id: stored)
+          return stored
+        rescue EngineClient::EngineError => e
+          if e.status == 404
+            Logger.info('stored_project_id_stale', project_id: stored)
+            Session.store_project_id_on_model(model, nil)
+          else
+            Logger.warn('project_lookup_failed', code: e.code, message: e.message)
+            return nil
+          end
+        end
+      end
+
+      chosen = UI::ProjectPicker.pick(project_context: Session.project || {})
+      return nil unless chosen
+
+      Session.project_id = chosen
+      Session.store_project_id_on_model(model, chosen)
+      Logger.info('project_id_selected', project_id: chosen)
+      chosen
+    end
+
+    # Menu action: explicitly re-prompt the picker even when an id
+    # is already set. Useful when a user moves a model between
+    # projects mid-session. Clears the in-memory selection first so
+    # ensure_project_selected runs the picker path.
+    def switch_project
+      return unless Session.authenticated?
+      Session.project_id = nil
+      ensure_project_selected
+    end
+
     def prompt_project_setup
       prompts = [
         'City',
@@ -299,6 +364,7 @@ unless file_loaded?(__FILE__)
   menu.add_item('Planara — Recent runs…')        { Planara::Boot.show_history }
   menu.add_item('Planara — Compare with last save') { Planara::Boot.compare_with_last_save }
   menu.add_item('Planara — Open last report in browser') { Planara::Boot.open_last_report }
+  menu.add_item('Planara — Switch project…')     { Planara::Boot.switch_project }
 
   file_loaded(__FILE__)
 end

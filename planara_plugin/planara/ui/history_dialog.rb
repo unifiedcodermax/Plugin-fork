@@ -4,6 +4,7 @@ require 'json'
 
 require_relative '../logger'
 require_relative '../engine_client'
+require_relative '../session'
 require_relative 'browser_view'
 
 module Planara
@@ -57,7 +58,14 @@ module Planara
       end
 
       def refresh
-        rows = EngineClient.list_history(limit: 50, offset: 0)
+        # Scope to the currently-selected project so the picker
+        # acts as a per-project history view. When no project is
+        # set, fall back to all-of-my-runs (the legacy behavior).
+        rows = EngineClient.list_history(
+          limit: 50,
+          offset: 0,
+          project_id: Session.project_id,
+        )
         push_rows(rows)
       rescue EngineClient::EngineError => e
         Logger.warn('history_list_failed', code: e.code, message: e.message)
