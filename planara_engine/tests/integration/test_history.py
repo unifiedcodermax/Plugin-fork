@@ -8,7 +8,6 @@ running in the same DB must not see the first user's reports.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any

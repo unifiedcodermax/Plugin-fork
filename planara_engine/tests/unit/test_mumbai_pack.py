@@ -17,7 +17,6 @@ import pytest
 from planara_engine.rules import applicable_rules
 from planara_engine.rules.loader import PACKS_DIR, get_pack, load_pack
 
-
 CURRENT_VERSION = "0.2.0"
 
 # Mumbai uses Island (south Mumbai) and Suburbs as classification —

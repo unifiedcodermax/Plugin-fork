@@ -17,7 +17,6 @@ from planara_engine.domain import (
     Violation,
 )
 
-
 # ---- Polygon -----------------------------------------------------------------
 
 

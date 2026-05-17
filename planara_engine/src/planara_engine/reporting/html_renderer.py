@@ -14,7 +14,7 @@ themselves when they need a fresh result.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html import escape
 from typing import Any
 
@@ -33,7 +33,7 @@ def render_html(
     production callers pass None and get the current UTC time.
     """
 
-    ts = generated_at or datetime.now(timezone.utc)
+    ts = generated_at or datetime.now(UTC)
 
     title = (
         f"Planara compliance report — "

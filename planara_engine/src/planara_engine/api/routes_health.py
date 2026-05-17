@@ -8,7 +8,7 @@ dependency never makes the engine look dead to the supervisor.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -37,5 +37,5 @@ async def health() -> HealthResponse:
     return HealthResponse(
         status="ok",
         version=__version__,
-        time=datetime.now(timezone.utc),
+        time=datetime.now(UTC),
     )

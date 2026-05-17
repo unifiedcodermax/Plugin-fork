@@ -18,7 +18,7 @@ from planara_engine.geometry.normalize import to_shapely
 def polygon_area(poly: Polygon) -> float:
     """Signed-positive area in square meters."""
 
-    return to_shapely(poly).area
+    return float(to_shapely(poly).area)
 
 
 def polygons_union_area(polys: list[Polygon]) -> float:
@@ -31,7 +31,7 @@ def polygons_union_area(polys: list[Polygon]) -> float:
     if not polys:
         return 0.0
     shapes = [to_shapely(p) for p in polys]
-    return unary_union(shapes).area
+    return float(unary_union(shapes).area)
 
 
 def inset(poly: Polygon, distance_m: float) -> ShapelyPolygon | None:
@@ -52,16 +52,16 @@ def inset(poly: Polygon, distance_m: float) -> ShapelyPolygon | None:
     # buffer can return MultiPolygon for awkward shapes; pick the
     # largest connected piece (almost always what the caller
     # wants for "permissible build envelope").
-    largest = max(shrunk.geoms, key=lambda g: g.area)  # type: ignore[attr-defined]
+    largest = max(shrunk.geoms, key=lambda g: g.area)
     return largest
 
 
 def polygon_within(inner: Polygon, outer: Polygon) -> bool:
     """True iff ``inner`` is contained within ``outer`` (boundary allowed)."""
 
-    return to_shapely(inner).within(to_shapely(outer)) or to_shapely(inner).equals(
-        to_shapely(outer)
-    )
+    inner_shp = to_shapely(inner)
+    outer_shp = to_shapely(outer)
+    return bool(inner_shp.within(outer_shp) or inner_shp.equals(outer_shp))
 
 
 def minimum_distance_to_boundary(inner: Polygon, outer: Polygon) -> float:
@@ -75,4 +75,4 @@ def minimum_distance_to_boundary(inner: Polygon, outer: Polygon) -> float:
 
     inner_shp = to_shapely(inner)
     outer_boundary = to_shapely(outer).boundary
-    return inner_shp.distance(outer_boundary)
+    return float(inner_shp.distance(outer_boundary))

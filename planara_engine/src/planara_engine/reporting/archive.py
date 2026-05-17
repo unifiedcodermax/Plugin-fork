@@ -14,7 +14,7 @@ unit to write to a project history table.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -64,7 +64,7 @@ def render_archive(
     """
 
     return ArchivalReport(
-        generated_at=generated_at or datetime.now(timezone.utc),
+        generated_at=generated_at or datetime.now(UTC),
         snapshot=snapshot,
         response=response,
     )

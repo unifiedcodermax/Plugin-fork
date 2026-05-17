@@ -49,6 +49,7 @@ def test_planara_error_envelope(client: TestClient) -> None:
     """
 
     from fastapi import FastAPI
+
     from planara_engine.api.errors import register_error_handlers
     from planara_engine.core.errors import NotFound
 

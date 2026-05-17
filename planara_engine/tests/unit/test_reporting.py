@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -25,7 +25,6 @@ from planara_engine.reporting import (
     render_archive,
     render_html,
 )
-
 
 # ---- fixtures ----------------------------------------------------------------
 
@@ -64,7 +63,7 @@ def _resp(*violations: Violation, ok: bool | None = None, metrics: dict | None =
 
 @pytest.fixture
 def fixed_ts() -> datetime:
-    return datetime(2026, 1, 15, 12, 30, 0, tzinfo=timezone.utc)
+    return datetime(2026, 1, 15, 12, 30, 0, tzinfo=UTC)
 
 
 # ---- HTML --------------------------------------------------------------------

@@ -26,7 +26,7 @@ def settings() -> Settings:
 @pytest.fixture
 def session(
     monkeypatch: pytest.MonkeyPatch,
-    settings: Settings,  # noqa: ARG001 — needed so jwt verify uses same secret
+    settings: Settings,
 ) -> Iterator[Session]:
     monkeypatch.setenv("PLANARA_DB_URL", "sqlite:///:memory:")
     monkeypatch.setenv("PLANARA_JWT_SECRET", "auth-service-test-secret-long-enough-for-hs256")

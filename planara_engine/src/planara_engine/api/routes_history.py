@@ -46,6 +46,7 @@ from planara_engine.reporting import (
     render_diff_html,
     render_html,
 )
+from planara_engine.reporting.diff import ReportDiff
 
 router = APIRouter(tags=["history"])
 log = get_logger("planara.api.history")
@@ -282,7 +283,8 @@ def _summary(row: Any) -> dict[str, Any]:
 def _build_diff(prev_row: Any, curr_row: Any) -> dict[str, Any]:
     """Load two stored payloads, parse, diff, serialize for JSON."""
 
-    return _diff_pair(prev_row, curr_row).model_dump(mode="json")
+    dumped: dict[str, Any] = _diff_pair(prev_row, curr_row).model_dump(mode="json")
+    return dumped
 
 
 def _build_diff_html(prev_row: Any, curr_row: Any) -> str:
@@ -291,7 +293,7 @@ def _build_diff_html(prev_row: Any, curr_row: Any) -> str:
     return render_diff_html(_diff_pair(prev_row, curr_row))
 
 
-def _diff_pair(prev_row: Any, curr_row: Any):
+def _diff_pair(prev_row: Any, curr_row: Any) -> ReportDiff:
     prev_archive = ArchivalReport.model_validate_json(prev_row.payload)
     curr_archive = ArchivalReport.model_validate_json(curr_row.payload)
     return diff_reports(prev_archive, curr_archive)

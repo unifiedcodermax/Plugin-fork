@@ -16,7 +16,6 @@ import pytest
 from planara_engine.rules import applicable_rules
 from planara_engine.rules.loader import PACKS_DIR, get_pack, load_pack
 
-
 # Bumped per pack version. Update alongside the JSON.
 CURRENT_VERSION = "0.3.0"
 

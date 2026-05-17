@@ -9,7 +9,7 @@ is its own attack surface.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -36,7 +36,7 @@ def mint_token(user_id: int, *, settings: Settings | None = None) -> str:
     """Mint a JWT for ``user_id`` with TTL from settings."""
 
     settings = settings or get_settings()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exp = now + timedelta(minutes=settings.jwt_ttl_minutes)
 
     payload: dict[str, Any] = {
@@ -74,8 +74,8 @@ def verify_token(token: str, *, settings: Settings | None = None) -> TokenClaims
 
     try:
         user_id = int(decoded["sub"])
-        issued_at = datetime.fromtimestamp(decoded["iat"], tz=timezone.utc)
-        expires_at = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc)
+        issued_at = datetime.fromtimestamp(decoded["iat"], tz=UTC)
+        expires_at = datetime.fromtimestamp(decoded["exp"], tz=UTC)
     except (KeyError, TypeError, ValueError) as exc:
         raise AuthenticationFailed("malformed token claims") from exc
 

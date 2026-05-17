@@ -55,7 +55,7 @@ def app_client(settings_with_db: Settings) -> Iterator[TestClient]:
 
 
 @pytest.fixture
-def seeded_user(app_client: TestClient) -> tuple[str, str]:  # noqa: ARG001 — app must boot first
+def seeded_user(app_client: TestClient) -> tuple[str, str]:
     """Seed a known user directly so login tests have something to call against."""
 
     username, password = "tester", "hunter2pass"
@@ -87,7 +87,7 @@ def test_login_wrong_password_is_401(app_client: TestClient, seeded_user: tuple[
 
 
 def test_login_unknown_user_is_401_with_same_message(
-    app_client: TestClient, seeded_user: tuple[str, str]  # noqa: ARG001
+    app_client: TestClient, seeded_user: tuple[str, str]
 ) -> None:
     resp = app_client.post("/auth/login", json={"username": "ghost", "password": "anything"})
     assert resp.status_code == 401

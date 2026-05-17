@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
@@ -48,7 +48,7 @@ def test_verify_rejects_wrong_signature(settings: Settings) -> None:
 
 
 def test_verify_rejects_expired_token(settings: Settings) -> None:
-    past = datetime.now(timezone.utc) - timedelta(hours=1)
+    past = datetime.now(UTC) - timedelta(hours=1)
     expired = jwt.encode(
         {"sub": "1", "iat": int(past.timestamp()), "exp": int(past.timestamp()) + 1},
         settings.jwt_secret.get_secret_value(),
@@ -59,7 +59,7 @@ def test_verify_rejects_expired_token(settings: Settings) -> None:
 
 
 def test_verify_rejects_missing_sub(settings: Settings) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     bad = jwt.encode(
         {"iat": int(now.timestamp()), "exp": int((now + timedelta(hours=1)).timestamp())},
         settings.jwt_secret.get_secret_value(),
@@ -70,7 +70,7 @@ def test_verify_rejects_missing_sub(settings: Settings) -> None:
 
 
 def test_verify_rejects_non_integer_sub(settings: Settings) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     bad = jwt.encode(
         {
             "sub": "not-an-int",

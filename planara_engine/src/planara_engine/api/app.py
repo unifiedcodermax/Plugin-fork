@@ -7,11 +7,14 @@ production goes through ``app`` for ``uvicorn planara_engine.api.app:app``.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI
 
+# Side-effect import: registers every evaluator with the engine
+# registry. Must run before any route handler dispatches a rule.
+import planara_engine.compliance  # noqa: F401
 from planara_engine import __version__
 from planara_engine.api.errors import register_error_handlers
 from planara_engine.api.middleware import RequestContextMiddleware
@@ -20,10 +23,6 @@ from planara_engine.api.routes_health import router as health_router
 from planara_engine.api.routes_history import router as history_router
 from planara_engine.api.routes_reports import router as reports_router
 from planara_engine.api.routes_validate import router as validate_router
-
-# Side-effect import: registers every evaluator with the engine
-# registry. Must run before any route handler dispatches a rule.
-import planara_engine.compliance  # noqa: F401, E402
 from planara_engine.core.logging import configure_logging, get_logger
 from planara_engine.core.settings import Settings, get_settings
 from planara_engine.persistence.database import init_db

@@ -6,7 +6,7 @@ Keeps SQL out of service code. Each function takes an explicit
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import Session, select
 
@@ -46,7 +46,7 @@ def create_user(
 def touch_user(session: Session, user: User) -> User:
     """Bump updated_at; used after password changes etc."""
 
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     session.flush()
     return user

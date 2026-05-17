@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from planara_engine.domain import (
     Building,
@@ -23,7 +23,6 @@ from planara_engine.reporting import (
     render_archive,
     render_diff_html,
 )
-
 
 # ---- fixtures ----------------------------------------------------------------
 
@@ -66,14 +65,14 @@ def _resp(*vs: Violation, metrics: dict | None = None, ok: bool | None = None) -
 
 
 def _arc(*vs: Violation, metrics: dict | None = None, ts: datetime | None = None, ok: bool | None = None) -> ArchivalReport:
-    return render_archive(_snap(), _resp(*vs, metrics=metrics, ok=ok), generated_at=ts or datetime(2026, 1, 1, tzinfo=timezone.utc))
+    return render_archive(_snap(), _resp(*vs, metrics=metrics, ok=ok), generated_at=ts or datetime(2026, 1, 1, tzinfo=UTC))
 
 
 # ---- structural --------------------------------------------------------------
 
 
 def test_diff_carries_report_ids_and_timestamps() -> None:
-    t1 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    t1 = datetime(2026, 1, 1, tzinfo=UTC)
     t2 = t1 + timedelta(hours=2)
     prev = _arc(ts=t1)
     curr = _arc(ts=t2)

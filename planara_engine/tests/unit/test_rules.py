@@ -11,7 +11,6 @@ from planara_engine.core.errors import NotFound, ValidationFailed
 from planara_engine.rules import applicable_rules, load_pack
 from planara_engine.rules.schema import Applicability, Rule, RulePack
 
-
 # ---- schema ------------------------------------------------------------------
 
 

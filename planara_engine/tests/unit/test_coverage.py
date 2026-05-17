@@ -7,7 +7,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from planara_engine.core.errors import RuleEvaluationError, ValidationFailed
+from planara_engine.core.errors import ValidationFailed
 from planara_engine.domain import (
     Building,
     Floor,

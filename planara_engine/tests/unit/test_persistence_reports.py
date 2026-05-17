@@ -9,7 +9,7 @@ recent runs" query cheap as the table grows.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -42,20 +42,20 @@ def user_id(engine: Engine) -> int:
 
 
 def _row(user_id: int, **overrides) -> ValidationReport:
-    defaults = dict(
-        user_id=user_id,
-        snapshot_id=uuid4(),
-        city="Bangalore",
-        classification="CBD",
-        zone="Residential",
-        ok=True,
-        violation_count=0,
-        error_count=0,
-        warning_count=0,
-        rule_pack_version="0.3.0",
-        generated_at=datetime.now(timezone.utc),
-        payload="{}",
-    )
+    defaults = {
+        "user_id": user_id,
+        "snapshot_id": uuid4(),
+        "city": "Bangalore",
+        "classification": "CBD",
+        "zone": "Residential",
+        "ok": True,
+        "violation_count": 0,
+        "error_count": 0,
+        "warning_count": 0,
+        "rule_pack_version": "0.3.0",
+        "generated_at": datetime.now(UTC),
+        "payload": "{}",
+    }
     defaults.update(overrides)
     return ValidationReport(**defaults)
 
@@ -110,7 +110,7 @@ def test_user_id_required(engine: Engine) -> None:
                 error_count=0,
                 warning_count=0,
                 rule_pack_version="0.3.0",
-                generated_at=datetime.now(timezone.utc),
+                generated_at=datetime.now(UTC),
                 payload="{}",
             ))
             s.commit()

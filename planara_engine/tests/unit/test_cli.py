@@ -5,11 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from sqlmodel import Session
 
 from planara_engine.cli import build_parser, main
 from planara_engine.persistence.database import get_engine
 from planara_engine.persistence.repository import get_user_by_username
-from sqlmodel import Session
 
 
 def test_parser_recognizes_subcommands() -> None:

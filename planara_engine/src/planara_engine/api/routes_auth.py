@@ -63,7 +63,7 @@ def login(req: LoginRequest, session: SessionDep) -> TokenResponse:
 def me(user: CurrentUser) -> MeResponse:
     # Caller is authenticated by virtue of CurrentUser resolving.
     return MeResponse(
-        id=user.id,  # type: ignore[arg-type]  # always set when loaded from DB
+        id=user.id,
         username=user.username,
         is_active=user.is_active,
         created_at=user.created_at,

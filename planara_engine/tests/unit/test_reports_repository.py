@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -95,7 +95,7 @@ def _archive(snap: Snapshot | None = None, resp: ValidationResponse | None = Non
     return render_archive(
         snap or _snap(),
         resp or _resp(),
-        generated_at=ts or datetime.now(timezone.utc),
+        generated_at=ts or datetime.now(UTC),
     )
 
 
@@ -171,7 +171,7 @@ def _save_n(session: Session, user_id: int, n: int, *, base_ts: datetime, snap_f
 def test_list_returns_user_scoped_only(engine: Engine, alice_id: int, bob_id: int) -> None:
     """Bob's saves must not appear in Alice's list."""
 
-    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
     with Session(engine) as s:
         _save_n(s, alice_id, 3, base_ts=base)
         _save_n(s, bob_id, 5, base_ts=base)
@@ -186,7 +186,7 @@ def test_list_returns_user_scoped_only(engine: Engine, alice_id: int, bob_id: in
 
 
 def test_list_orders_recent_first(engine: Engine, alice_id: int) -> None:
-    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
     with Session(engine) as s:
         rows = _save_n(s, alice_id, 4, base_ts=base)
         # Capture timestamps inside the session — SQLAlchemy detaches
@@ -202,7 +202,7 @@ def test_list_orders_recent_first(engine: Engine, alice_id: int) -> None:
 
 
 def test_list_paginates(engine: Engine, alice_id: int) -> None:
-    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
     with Session(engine) as s:
         _save_n(s, alice_id, 25, base_ts=base)
 
@@ -219,7 +219,7 @@ def test_list_paginates(engine: Engine, alice_id: int) -> None:
 
 
 def test_list_filters_combine_with_and(engine: Engine, alice_id: int) -> None:
-    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
 
     def factory(i: int) -> Snapshot:
         if i % 2 == 0:
@@ -244,7 +244,7 @@ def test_list_filters_combine_with_and(engine: Engine, alice_id: int) -> None:
 
 
 def test_list_filters_by_ok(engine: Engine, alice_id: int) -> None:
-    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
     with Session(engine) as s:
         # Two passing, one failing.
         save_report(s, user_id=alice_id, archive=_archive(ts=base))
@@ -266,7 +266,7 @@ def test_list_filters_by_ok(engine: Engine, alice_id: int) -> None:
 
 
 def test_count_matches_filters(engine: Engine, alice_id: int, bob_id: int) -> None:
-    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
     with Session(engine) as s:
         _save_n(s, alice_id, 7, base_ts=base)
         _save_n(s, bob_id, 3, base_ts=base)
@@ -321,7 +321,7 @@ def test_get_prior_returns_most_recent_earlier_match(engine: Engine, alice_id: i
     """Same (city, classification, zone), earliest timestamp before
     target. Different contexts must be skipped."""
 
-    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
     with Session(engine) as s:
         a = save_report(s, user_id=alice_id, archive=_archive(snap=_snap(city="Bangalore", zone="Residential"), ts=base))
         # Different city — skip when looking for prior of a Bangalore.
@@ -349,7 +349,7 @@ def test_get_prior_other_user_returns_none(engine: Engine, alice_id: int, bob_id
     """Cross-user isolation: Bob's prior reports must not surface
     when Alice asks for prior of Alice's report."""
 
-    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
     with Session(engine) as s:
         # Bob has earlier runs in the same context; they MUST NOT
         # be returned as Alice's prior.
