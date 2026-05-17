@@ -6,11 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A SketchUp Ruby extension ("Abid Building by laws (Bangalore)") that performs live compliance checks — FSI/FAR, setbacks, height — against Bangalore building bylaws as the user models in SketchUp. Requires SketchUp 2020+ (`Sketchup.version.to_i >= 20`).
 
+This file documents the **legacy** prototype (now under `legacy/SV-Abid/`). The active codebase is the hybrid Ruby plugin (`planara_plugin/`) + Python engine (`planara_engine/`); see `ARCHITECTURE.md` for that surface.
+
 ## Build / run / install
 
 There is no build system, package manager, lint, or test suite. To run the extension:
 
-- Copy `SV-Abid.rb` and the `SV-Abid/` folder into SketchUp's `Plugins` directory (e.g. `~/Library/Application Support/SketchUp 2024/SketchUp/Plugins/` on macOS), then restart SketchUp.
+- Copy `legacy/SV-Abid.rb` and the `legacy/SV-Abid/` folder into SketchUp's `Plugins` directory (e.g. `~/Library/Application Support/SketchUp 2024/SketchUp/Plugins/` on macOS), then restart SketchUp.
 - The plugin appears under `Plugins → Abid Building by laws (Bangalore)`. Selecting it calls `SV_Abid.init_plugin`.
 - Iterating: use SketchUp's Ruby Console (`Window → Ruby Console`) to `load` files and inspect `puts` output. The codebase uses `puts` extensively for tracing — keep an eye on that console.
 
@@ -18,10 +20,10 @@ There is no build system, package manager, lint, or test suite. To run the exten
 
 ### Entry points (two parallel flows exist)
 
-There are **two distinct module entry trees** that both define `module SV_Abid`. They are not currently both wired in from `SV-Abid.rb`, but file requires reference both. Be aware which one a change affects:
+There are **two distinct module entry trees** that both define `module SV_Abid`. They are not currently both wired in from `legacy/SV-Abid.rb`, but file requires reference both. Be aware which one a change affects:
 
-1. **Active flow** — `SV-Abid.rb` → `SV-Abid/main.rb` → `SV_Abid.init_plugin`. Registers observers and shows `UIInput.show_input_dialog`. This is what the menu item invokes.
-2. **Legacy/alternate flow** — `SV-Abid/abid_start.rb` defines `SV_Abid::UIManager` with its own `setup` / `show_ui` / `update_panel` and its own `Plugins` menu item. It uses `ui/dialog.html` (via `HtmlDialog#set_file`) rather than the inline HTML in `ui/display_ui.rb`. It is not required from `main.rb` but registers its menu item if loaded.
+1. **Active flow** — `legacy/SV-Abid.rb` → `legacy/SV-Abid/main.rb` → `SV_Abid.init_plugin`. Registers observers and shows `UIInput.show_input_dialog`. This is what the menu item invokes.
+2. **Legacy/alternate flow** — `legacy/SV-Abid/abid_start.rb` defines `SV_Abid::UIManager` with its own `setup` / `show_ui` / `update_panel` and its own `Plugins` menu item. It uses `ui/dialog.html` (via `HtmlDialog#set_file`) rather than the inline HTML in `ui/display_ui.rb`. It is not required from `main.rb` but registers its menu item if loaded.
 
 When changing behavior, decide which flow you're modifying and don't accidentally fork them further.
 

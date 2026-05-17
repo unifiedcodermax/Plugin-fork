@@ -11,20 +11,55 @@ See `../ARCHITECTURE.md` for the full system design.
 
 ```
 planara_plugin/
-  loader.rb              # Top-level extension registrar (sibling of legacy SV-Abid.rb)
+  loader.rb                # Top-level extension registrar
   planara/
-    boot.rb              # Lifecycle wiring
-    config.rb            # Plugin-side settings (engine URL, port, paths)
-    engine_client.rb     # Net::HTTP client → planara_engine
-    engine_supervisor.rb # Spawn/healthcheck/stop the Python sidecar
-    session.rb           # Holds the JWT after login
-    logger.rb            # Plugin-side logging helper
+    boot.rb                # Lifecycle wiring + menu items
+    config.rb              # Plugin-side settings (engine URL, port, paths)
+    engine_client.rb       # Net::HTTP client → planara_engine
+    engine_supervisor.rb   # Spawn/healthcheck/stop the Python sidecar
+    session.rb             # JWT + project metadata + last_report_id
+    logger.rb              # Plugin-side logging helper
+    geometry/
+      extractor.rb         # Sketchup::* → JSON snapshot
+      units.rb             # Inches ↔ meters conversion
+    observers/
+      live_validator.rb    # Debounced ModelObserver → /validate
+    ui/
+      login_dialog.rb      # HtmlDialog backed by assets/login.html
+      results_dialog.rb    # Live-results panel backed by assets/results.html
+      history_dialog.rb    # Recent runs list backed by assets/history.html
+      browser_view.rb      # Open engine-rendered HTML in the default browser
+test/
+  test_extractor.rb        # Pure-data unit tests for extractor helpers
+  test_units.rb            # Unit conversions
+  test_engine_client.rb    # HTTP client stubbed at the transport seam
 ```
 
-Observers, geometry extraction, and UI screens will land in
-later sprints. This folder coexists with the legacy `SV-Abid/`
-tree — that tree stays untouched as a working reference until the
-migration is fully verified.
+The legacy Ruby-only prototype lives under `../legacy/SV-Abid/`
+and is preserved as a reference until the migration is fully
+verified. New work should not extend it.
+
+---
+
+## Menu items
+
+After activation (`Plugins → Planara — Compliance Check`), the
+following submenu actions are also available:
+
+- **Save current run** — extract the snapshot, post to `/history`,
+  and stash the returned `report_id` on `Session` so the
+  follow-on menu items can address it.
+- **Recent runs…** — open the history HtmlDialog. Each row has
+  "Open" (re-render the archive in your browser) and "vs prior"
+  (auto-diff against the previous run with the same project
+  context). Tick two rows to compare them pairwise.
+- **Compare with last save** — save the current state, then
+  fetch `/history/{id}/diff/html` and open it in the default
+  browser. The marquee "did my last edit make things better or
+  worse?" affordance.
+- **Open last report in browser** — re-render the archive whose
+  `report_id` is on `Session` and open it in the default
+  browser.
 
 ---
 

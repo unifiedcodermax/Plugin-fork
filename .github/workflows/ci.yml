@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A push that lands while a previous run for the same ref is still
+# in progress should cancel the older one — saving runner minutes
+# and giving fresh feedback on the latest tip of the branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: engine (py ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    defaults:
+      run:
+        working-directory: planara_engine
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: planara_engine/pyproject.toml
+
+      - name: Install (engine + dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check src tests
+
+      - name: Mypy
+        run: mypy src
+
+      - name: Pytest
+        run: pytest -q
+
+  plugin:
+    name: plugin (ruby ${{ matrix.ruby-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby-version: ["3.2", "3.3"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby ${{ matrix.ruby-version }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby-version }}
+
+      - name: Install minitest
+        # The plugin's own code is stdlib-only, but the test runner
+        # needs minitest. No Gemfile lives in this repo on purpose
+        # (SketchUp's Ruby has no gem manager), so we install
+        # minitest directly into the CI Ruby.
+        run: gem install minitest
+
+      - name: Run plugin tests
+        run: |
+          ruby planara_plugin/test/test_units.rb
+          ruby planara_plugin/test/test_extractor.rb
+          ruby planara_plugin/test/test_engine_client.rb

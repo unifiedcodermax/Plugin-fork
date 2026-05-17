@@ -7,8 +7,9 @@ overlays) live, while the user models.
 
 This document describes the **target** architecture being built in
 this repository. The original Ruby-only prototype lives under
-`SV-Abid/` and is preserved as a reference; new code lives under
-`planara_plugin/` (Ruby) and `planara_engine/` (Python).
+`legacy/SV-Abid/` (see `legacy/README.md`) and is preserved as a
+reference; new code lives under `planara_plugin/` (Ruby) and
+`planara_engine/` (Python).
 
 ---
 
@@ -206,6 +207,56 @@ EngineSupervisor.stop    ── SIGTERM uvicorn, wait, SIGKILL on timeout
 
 ---
 
+## 5b. Reports, history, diffs
+
+`/validate` is stateless: each call evaluates the snapshot and
+returns violations. The engine also exposes a **report** surface
+on top of that:
+
+- **`POST /reports`** wraps the validation result in an
+  `ArchivalReport` (snapshot + response + `generated_at` +
+  `rule_pack_version`) and returns it. **`GET /reports/html`**
+  renders the same as a standalone HTML document. Neither
+  endpoint touches the database — they are "render once, throw
+  away."
+
+- **`POST /history`** is `POST /reports` plus a write to the
+  `ValidationReport` SQL table, keyed by the caller's user id.
+  Returns the same archive shape with a fresh `report_id`. The
+  table indexes `(user_id, generated_at desc)` and `(user_id,
+  city, classification, zone, generated_at desc)` so the auto-diff
+  lookup is one query.
+
+- **`GET /history`** paginates the caller's saved rows
+  (most-recent-first), optionally filtered by `city`,
+  `classification`, `zone`, or `ok`. The list view omits the
+  payload to keep responses small; `GET /history/{id}` returns
+  the full archive.
+
+- **`GET /history/{id}/diff`** is the regression check: load this
+  report and the most-recent prior with the same
+  `(user_id, city, classification, zone)`, diff the two
+  archives, and return a `ReportDiff` (added / removed / changed /
+  unchanged violations + signed metric deltas + a
+  verdict of improved / regressed / mixed / unchanged).
+  **`GET /history/diff?from=X&to=Y`** is the explicit form for
+  comparing two specific reports the caller picked.
+
+- The HTML variants (`/history/{id}/html`,
+  `/history/{id}/diff/html`, `/history/diff/html`) re-render the
+  same payloads as standalone HTML documents for opening in a
+  browser tab.
+
+Every read is user-scoped — both "doesn't exist" and "belongs to
+someone else" surface as `404` so the response shape doesn't leak
+existence to a probing caller.
+
+The plugin wires this surface to four menu items: *Save current
+run*, *Recent runs…*, *Compare with last save*, *Open last
+report in browser* (see `planara_plugin/planara/boot.rb`).
+
+---
+
 ## 6. Module responsibilities
 
 | Module | Owns |
@@ -240,6 +291,6 @@ EngineSupervisor.stop    ── SIGTERM uvicorn, wait, SIGKILL on timeout
 
 ## 8. Where to look next
 
-- `CLAUDE.md` — what the legacy `SV-Abid/` Ruby code does today.
+- `CLAUDE.md` — what the legacy `legacy/SV-Abid/` Ruby code does today.
 - `planara_engine/README.md` — engine quickstart (added in Sprint 1).
 - `planara_plugin/README.md` — plugin install/dev guide (added in Sprint 1).
