@@ -1,4 +1,4 @@
-"""Project metadata: classification, zone, city.
+"""ProjectContext metadata: classification, zone, city.
 
 These are the dimensions rule applicability is keyed on. Strings
 are intentionally not constrained to enums here — the rule pack
@@ -6,6 +6,11 @@ defines the universe of valid values for a given city, and a
 typo in the plugin should surface as "no rules matched" rather
 than "validation rejected your enum value", so the user can fix
 it.
+
+Note: this is the *context* of a design (the rule-applicability
+dimensions), distinct from the persisted `Project` entity in
+``persistence/models.py`` (the user-named row that groups runs
+together for regression-tracking).
 """
 
 from __future__ import annotations
@@ -13,7 +18,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
-class Project(BaseModel):
+class ProjectContext(BaseModel):
     """Compliance context for a single design.
 
     classification: typically CBD / Heritage / HDZ for Bangalore.

@@ -10,7 +10,7 @@ from planara_engine.domain import (
     Floor,
     Plot,
     Polygon,
-    Project,
+    ProjectContext,
     Severity,
     Snapshot,
     ValidationResponse,
@@ -47,26 +47,26 @@ def test_polygon_with_hole() -> None:
     assert len(p.holes) == 1
 
 
-# ---- Project / Plot ----------------------------------------------------------
+# ---- ProjectContext / Plot ----------------------------------------------------------
 
 
 def test_project_minimal() -> None:
-    Project(city="Bangalore", classification="CBD", zone="Residential")
+    ProjectContext(city="Bangalore", classification="CBD", zone="Residential")
 
 
 def test_project_overlays_default_empty() -> None:
-    p = Project(city="Bangalore", classification="CBD", zone="Residential")
+    p = ProjectContext(city="Bangalore", classification="CBD", zone="Residential")
     assert p.overlays == []
 
 
 def test_project_overlays_round_trip() -> None:
-    p = Project(
+    p = ProjectContext(
         city="Bangalore",
         classification="CBD",
         zone="Residential",
         overlays=["airport", "heritage_influence"],
     )
-    restored = Project.model_validate_json(p.model_dump_json())
+    restored = ProjectContext.model_validate_json(p.model_dump_json())
     assert restored.overlays == ["airport", "heritage_influence"]
 
 
@@ -143,7 +143,7 @@ def test_building_parking_slots_round_trips_through_json() -> None:
 
 def test_snapshot_assigns_uuid_when_missing() -> None:
     snap = Snapshot(
-        project=Project(city="Bangalore", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="Bangalore", classification="CBD", zone="Residential"),
         plot=Plot(polygon=_square(20)),
         building=Building(floors=[Floor(level=0, polygon=_square(15), height_m=3.0)]),
     )
@@ -152,7 +152,7 @@ def test_snapshot_assigns_uuid_when_missing() -> None:
 
 def test_snapshot_round_trip_through_json() -> None:
     snap = Snapshot(
-        project=Project(city="Bangalore", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="Bangalore", classification="CBD", zone="Residential"),
         plot=Plot(polygon=_square(20), area_m2=400.0),
         building=Building(
             floors=[
@@ -175,7 +175,7 @@ def test_snapshot_schema_version_defaults() -> None:
     from planara_engine.domain.snapshot import CURRENT_SCHEMA_VERSION
 
     snap = Snapshot(
-        project=Project(city="Bangalore", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="Bangalore", classification="CBD", zone="Residential"),
         plot=Plot(polygon=_square(20)),
         building=Building(floors=[Floor(level=0, polygon=_square(15), height_m=3.0)]),
     )
@@ -189,7 +189,7 @@ def test_snapshot_accepts_older_schema_version() -> None:
 
     snap = Snapshot(
         schema_version="0.9",
-        project=Project(city="Bangalore", classification="CBD", zone="Residential"),
+        project=ProjectContext(city="Bangalore", classification="CBD", zone="Residential"),
         plot=Plot(polygon=_square(20)),
         building=Building(floors=[Floor(level=0, polygon=_square(15), height_m=3.0)]),
     )

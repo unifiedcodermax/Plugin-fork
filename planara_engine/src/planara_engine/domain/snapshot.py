@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from planara_engine.domain.building import Building
 from planara_engine.domain.plot import Plot
-from planara_engine.domain.project import Project
+from planara_engine.domain.project_context import ProjectContext
 
 # The current wire-format version. Bumped when a non-additive change
 # lands (e.g. renaming a required field, changing units). Additive
@@ -39,6 +39,6 @@ class Snapshot(BaseModel):
 
     schema_version: str = Field(default=CURRENT_SCHEMA_VERSION, min_length=1, max_length=16)
     snapshot_id: UUID = Field(default_factory=uuid4)
-    project: Project
+    project: ProjectContext
     plot: Plot
     building: Building
