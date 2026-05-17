@@ -53,6 +53,13 @@ class NotFound(PlanaraError):
     http_status = 404
 
 
+class Conflict(PlanaraError):
+    """Request collides with existing state (eg duplicate name)."""
+
+    code = "conflict"
+    http_status = 409
+
+
 class RuleEvaluationError(PlanaraError):
     """An evaluator raised. Treated as a server-side bug — the rule
     schema should have caught it earlier."""

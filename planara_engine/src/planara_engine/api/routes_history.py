@@ -32,6 +32,7 @@ from planara_engine.core.errors import NotFound
 from planara_engine.core.logging import get_logger
 from planara_engine.domain import Snapshot
 from planara_engine.engine import evaluate
+from planara_engine.persistence.projects import get_project
 from planara_engine.persistence.reports import (
     count_reports,
     get_prior_report,
@@ -68,18 +69,41 @@ def save_history(
     snapshot: Snapshot,
     user: CurrentUser,
     session: SessionDep,
+    project_id: Annotated[int | None, Query(ge=1)] = None,
 ) -> JSONResponse:
-    """Run /validate's engine internally, archive the result, persist."""
+    """Run /validate's engine internally, archive the result, persist.
+
+    ``project_id`` is optional. When supplied it must reference a
+    project owned by the calling user — a missing or other-user
+    project surfaces as 404 (same response shape as elsewhere, so
+    the route doesn't leak whose project an id belongs to). The
+    project_id is stored on the row so auto-diff can anchor on it
+    in subsequent /history/{id}/diff calls.
+    """
+
+    if project_id is not None:
+        project = get_project(session, user_id=user.id, project_id=project_id)  # type: ignore[arg-type]
+        if project is None:
+            raise NotFound(
+                f"no project with id {project_id}",
+                details={"project_id": project_id},
+            )
 
     response = evaluate(snapshot)
     archive = render_archive(snapshot, response)
-    row = save_report(session, user_id=user.id, archive=archive)  # type: ignore[arg-type]
+    row = save_report(
+        session,
+        user_id=user.id,  # type: ignore[arg-type]
+        archive=archive,
+        project_id=project_id,
+    )
 
     log.info(
         "history_saved",
         user=user.username,
         report_id=str(row.report_id),
         snapshot_id=str(snapshot.snapshot_id),
+        project_id=project_id,
         ok=response.ok,
         violation_count=len(response.violations),
     )
@@ -99,6 +123,7 @@ def list_history(
     session: SessionDep,
     limit: Annotated[int, Query(ge=1, le=_MAX_LIMIT)] = _DEFAULT_LIMIT,
     offset: Annotated[int, Query(ge=0)] = 0,
+    project_id: Annotated[int | None, Query(ge=1)] = None,
     city: str | None = None,
     classification: str | None = None,
     zone: str | None = None,
@@ -109,6 +134,11 @@ def list_history(
     The list intentionally omits the full payload — that would
     balloon the response. Clients that need the archive fetch by
     report_id.
+
+    ``project_id`` narrows to one project's runs (the project picker
+    uses this to populate the "Recent runs" pane). The repo trusts
+    the id; if it doesn't belong to this user the user-scoped query
+    naturally returns nothing.
     """
 
     rows = list_reports(
@@ -116,6 +146,7 @@ def list_history(
         user_id=user.id,  # type: ignore[arg-type]
         limit=limit,
         offset=offset,
+        project_id=project_id,
         city=city,
         classification=classification,
         zone=zone,
@@ -124,6 +155,7 @@ def list_history(
     total = count_reports(
         session,
         user_id=user.id,  # type: ignore[arg-type]
+        project_id=project_id,
         city=city,
         classification=classification,
         zone=zone,
@@ -268,6 +300,7 @@ def _summary(row: Any) -> dict[str, Any]:
     return {
         "report_id": str(row.report_id),
         "snapshot_id": str(row.snapshot_id),
+        "project_id": row.project_id,
         "city": row.city,
         "classification": row.classification,
         "zone": row.zone,

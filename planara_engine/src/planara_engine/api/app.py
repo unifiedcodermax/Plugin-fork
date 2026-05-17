@@ -21,6 +21,7 @@ from planara_engine.api.middleware import RequestContextMiddleware
 from planara_engine.api.routes_auth import router as auth_router
 from planara_engine.api.routes_health import router as health_router
 from planara_engine.api.routes_history import router as history_router
+from planara_engine.api.routes_projects import router as projects_router
 from planara_engine.api.routes_reports import router as reports_router
 from planara_engine.api.routes_validate import router as validate_router
 from planara_engine.core.logging import configure_logging, get_logger
@@ -70,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(validate_router)
     app.include_router(reports_router)
     app.include_router(history_router)
+    app.include_router(projects_router)
 
     return app
 

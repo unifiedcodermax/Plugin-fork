@@ -543,3 +543,164 @@ def test_diff_html_requires_auth(app_client: TestClient) -> None:
     fake = "00000000-0000-0000-0000-000000000000"
     resp = app_client.get(f"/history/diff/html?from={fake}&to={fake}")
     assert resp.status_code == 401
+
+
+# ---- /history project_id (S13) ----------------------------------------------
+#
+# A Project is the regression-tracking anchor on the route layer:
+# POST /history?project_id=<id> stamps the save with the project,
+# GET  /history?project_id=<id> narrows the list, and the auto-diff
+# endpoint then pairs runs by project rather than by (city,
+# classification, zone). These tests exercise the route surface;
+# repo-level semantics live in tests/unit/test_reports_repository.py.
+
+
+def _make_project(
+    client: TestClient,
+    headers: dict[str, str],
+    *,
+    name: str,
+    city: str = "Bangalore",
+    classification: str = "CBD",
+    zone: str = "Residential",
+) -> int:
+    resp = client.post(
+        "/projects",
+        json={"name": name, "city": city, "classification": classification, "zone": zone},
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"]
+
+
+def test_save_with_project_id_stamps_row_and_summary(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """POST /history?project_id=… anchors the row to the project;
+    the summary on the list endpoint exposes that id so the plugin
+    can build per-project history views."""
+
+    pid = _make_project(app_client, alice, name="anchored")
+    save = app_client.post(
+        f"/history?project_id={pid}", json=_bangalore(), headers=alice
+    )
+    assert save.status_code == 201
+
+    listing = app_client.get("/history", headers=alice).json()
+    assert listing["total"] == 1
+    item = listing["items"][0]
+    assert item["project_id"] == pid
+
+
+def test_save_without_project_id_leaves_summary_null(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """Backward compatibility: clients that don't pass project_id
+    still work, and the summary surfaces a null anchor."""
+
+    app_client.post("/history", json=_bangalore(), headers=alice)
+    item = app_client.get("/history", headers=alice).json()["items"][0]
+    assert item["project_id"] is None
+
+
+def test_save_with_other_users_project_id_returns_404(
+    app_client: TestClient, alice: dict[str, str], bob: dict[str, str]
+) -> None:
+    """Existence must NOT leak — Bob trying to save under Alice's
+    project_id gets a 404, same shape as a nonexistent id, and no
+    row is persisted on Bob's history."""
+
+    alice_pid = _make_project(app_client, alice, name="alice's")
+    resp = app_client.post(
+        f"/history?project_id={alice_pid}", json=_bangalore(), headers=bob
+    )
+    assert resp.status_code == 404
+    # No row was written for Bob.
+    bob_list = app_client.get("/history", headers=bob).json()
+    assert bob_list["total"] == 0
+
+
+def test_save_with_unknown_project_id_returns_404(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    resp = app_client.post(
+        "/history?project_id=99999", json=_bangalore(), headers=alice
+    )
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "not_found"
+
+
+def test_list_filters_by_project_id(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """GET /history?project_id=… narrows to a single project's runs;
+    legacy NULL rows and other projects are excluded."""
+
+    p1 = _make_project(app_client, alice, name="p1")
+    p2 = _make_project(app_client, alice, name="p2")
+
+    for _ in range(2):
+        app_client.post(f"/history?project_id={p1}", json=_bangalore(), headers=alice)
+    app_client.post(f"/history?project_id={p2}", json=_bangalore(), headers=alice)
+    # Legacy save (no project_id).
+    app_client.post("/history", json=_bangalore(), headers=alice)
+
+    p1_list = app_client.get(f"/history?project_id={p1}", headers=alice).json()
+    assert p1_list["total"] == 2
+    assert {it["project_id"] for it in p1_list["items"]} == {p1}
+
+    p2_list = app_client.get(f"/history?project_id={p2}", headers=alice).json()
+    assert p2_list["total"] == 1
+
+    # Without the filter, all 4 saves are visible.
+    all_list = app_client.get("/history", headers=alice).json()
+    assert all_list["total"] == 4
+
+
+def test_auto_diff_uses_project_anchor_not_context(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """Two projects sharing the same (city, classification, zone)
+    must live in separate diff lanes. Without project anchoring,
+    saving under p2 between two p1 saves would make p2 the prior
+    for p1 — this test asserts the route surface picks the right
+    prior via project_id."""
+
+    p1 = _make_project(app_client, alice, name="north")
+    p2 = _make_project(app_client, alice, name="south")
+
+    p1_first = app_client.post(
+        f"/history?project_id={p1}", json=_bangalore(), headers=alice
+    ).json()["report_id"]
+    # Interleaved p2 save with identical context — must NOT
+    # surface as p1's prior.
+    app_client.post(f"/history?project_id={p2}", json=_bangalore(), headers=alice)
+    p1_second = app_client.post(
+        f"/history?project_id={p1}", json=_bangalore(), headers=alice
+    ).json()["report_id"]
+
+    resp = app_client.get(f"/history/{p1_second}/diff", headers=alice)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["from_report_id"] == p1_first
+    assert body["to_report_id"] == p1_second
+
+
+def test_auto_diff_project_anchored_skips_legacy_rows(
+    app_client: TestClient, alice: dict[str, str]
+) -> None:
+    """A user adopting projects mid-stream shouldn't suddenly see
+    a project-anchored save pair against an older legacy run — the
+    auto-diff returns 404 (no prior in this project) rather than
+    silently crossing lanes."""
+
+    # Legacy save first.
+    app_client.post("/history", json=_bangalore(), headers=alice)
+    # Then the user creates a project and saves under it.
+    pid = _make_project(app_client, alice, name="adopted later")
+    anchored = app_client.post(
+        f"/history?project_id={pid}", json=_bangalore(), headers=alice
+    ).json()["report_id"]
+
+    resp = app_client.get(f"/history/{anchored}/diff", headers=alice)
+    assert resp.status_code == 404
