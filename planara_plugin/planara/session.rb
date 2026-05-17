@@ -21,6 +21,7 @@ module Planara
     def clear
       @token = nil
       @project = nil
+      @last_report_id = nil
     end
 
     def authenticated?
@@ -47,6 +48,18 @@ module Planara
       p = @project
       !p.nil? && !p[:city].to_s.empty? &&
         !p[:classification].to_s.empty? && !p[:zone].to_s.empty?
+    end
+
+    # Most-recently-saved report_id for the current SketchUp
+    # session. Powers "Open last report in browser" — only valid
+    # for this process; we deliberately don't persist it across
+    # restarts so we never point at a stale row after a wipe.
+    def last_report_id
+      @last_report_id
+    end
+
+    def last_report_id=(value)
+      @last_report_id = value
     end
   end
 end

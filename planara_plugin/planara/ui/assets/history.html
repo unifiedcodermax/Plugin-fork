@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Planara — Recent runs</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fg: #1a1a1a;
+    --muted: #666;
+    --bg: #ffffff;
+    --row-alt: #f6f6f6;
+    --border: #e4e4e4;
+    --accent: #1e6fdb;
+    --ok: #1b8a3a;
+    --bad: #b32020;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fg: #e8e8e8;
+      --muted: #9aa1ab;
+      --bg: #1c1c1c;
+      --row-alt: #232323;
+      --border: #353535;
+      --accent: #6aa6ff;
+      --ok: #5bd07e;
+      --bad: #ff7676;
+    }
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    margin: 0;
+    padding: 16px;
+    font-size: 13px;
+  }
+  h1 { font-size: 16px; margin: 0 0 12px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .toolbar input { flex: 1; padding: 4px 8px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  tbody tr.selected { outline: 2px solid var(--accent); }
+  td.ok { color: var(--ok); }
+  td.bad { color: var(--bad); }
+  td.muted { color: var(--muted); font-size: 12px; }
+  button {
+    background: var(--accent);
+    color: white;
+    border: 0;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .empty { color: var(--muted); padding: 24px; text-align: center; }
+  .footer { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .pair-hint { color: var(--muted); }
+  .pair-hint b { color: var(--fg); }
+</style>
+</head>
+<body>
+<h1>Recent validation runs</h1>
+
+<div class="toolbar">
+  <button id="refresh" class="secondary">Refresh</button>
+  <button id="diffPair" disabled>Compare selected pair</button>
+  <span id="pairHint" class="pair-hint"></span>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>When</th>
+      <th>City</th>
+      <th>Classification</th>
+      <th>Zone</th>
+      <th>Status</th>
+      <th>Issues</th>
+      <th>Pack</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="rows">
+    <tr><td colspan="9" class="empty">Loading…</td></tr>
+  </tbody>
+</table>
+
+<div class="footer">
+  <span id="summary"></span>
+</div>
+
+<script>
+  window.Planara = window.Planara || {};
+
+  // Selection model for explicit-diff (from, to).
+  const selection = { from: null, to: null };
+
+  function fmtTime(iso) {
+    try { return new Date(iso).toLocaleString(); } catch (_) { return iso; }
+  }
+
+  function renderRows(items) {
+    const tbody = document.getElementById('rows');
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">No saved runs yet. Use “Planara → Save current run”.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map(r => {
+      const issues = (r.violation_count || 0);
+      const cls = r.ok ? 'ok' : 'bad';
+      const verdict = r.ok ? 'pass' : 'fail';
+      return `
+        <tr data-id="${r.report_id}">
+          <td><input type="checkbox" class="pick" data-id="${r.report_id}"></td>
+          <td>${fmtTime(r.generated_at)}</td>
+          <td>${r.city || ''}</td>
+          <td>${r.classification || ''}</td>
+          <td>${r.zone || ''}</td>
+          <td class="${cls}">${verdict}</td>
+          <td>${issues}${r.error_count ? ' (' + r.error_count + ' err)' : ''}</td>
+          <td class="muted">${r.rule_pack_version || ''}</td>
+          <td>
+            <button class="open" data-id="${r.report_id}">Open</button>
+            <button class="autodiff secondary" data-id="${r.report_id}">vs prior</button>
+          </td>
+        </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('button.open').forEach(b => {
+      b.addEventListener('click', () => sketchup.open_report(b.dataset.id));
+    });
+    tbody.querySelectorAll('button.autodiff').forEach(b => {
+      b.addEventListener('click', () => sketchup.auto_diff(b.dataset.id));
+    });
+    tbody.querySelectorAll('input.pick').forEach(c => {
+      c.addEventListener('change', onPick);
+    });
+  }
+
+  function onPick(e) {
+    const id = e.target.dataset.id;
+    if (e.target.checked) {
+      if (!selection.from) selection.from = id;
+      else if (!selection.to)  selection.to = id;
+      else {
+        // Roll the window: oldest pick drops, new one takes "to".
+        selection.from = selection.to;
+        selection.to = id;
+      }
+    } else {
+      if (selection.from === id) selection.from = null;
+      if (selection.to === id) selection.to = null;
+    }
+
+    document.querySelectorAll('tbody tr').forEach(tr => tr.classList.remove('selected'));
+    [selection.from, selection.to].filter(Boolean).forEach(id => {
+      const tr = document.querySelector(`tr[data-id="${id}"]`);
+      if (tr) tr.classList.add('selected');
+    });
+
+    document.querySelectorAll('input.pick').forEach(c => {
+      c.checked = (c.dataset.id === selection.from || c.dataset.id === selection.to);
+    });
+
+    const ready = selection.from && selection.to && selection.from !== selection.to;
+    document.getElementById('diffPair').disabled = !ready;
+    document.getElementById('pairHint').innerHTML =
+      ready ? `from <b>${selection.from.slice(0, 8)}</b> → to <b>${selection.to.slice(0, 8)}</b>` :
+      selection.from ? `from <b>${selection.from.slice(0, 8)}</b> (pick a second row)` :
+      'Tick two rows to compare them.';
+  }
+
+  document.getElementById('refresh').addEventListener('click', () => sketchup.refresh());
+  document.getElementById('diffPair').addEventListener('click', () => {
+    if (selection.from && selection.to) sketchup.explicit_diff(selection.from, selection.to);
+  });
+
+  Planara.onRows = function (payload) {
+    renderRows(payload.items || []);
+    const total = payload.total || 0;
+    const shown = (payload.items || []).length;
+    document.getElementById('summary').textContent =
+      `Showing ${shown} of ${total}`;
+  };
+
+  Planara.onError = function (message) {
+    const tbody = document.getElementById('rows');
+    tbody.innerHTML = `<tr><td colspan="9" class="empty">${message}</td></tr>`;
+  };
+
+  if (typeof sketchup !== 'undefined' && sketchup.ready) sketchup.ready();
+</script>
+</body>
+</html>

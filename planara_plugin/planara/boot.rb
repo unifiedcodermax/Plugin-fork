@@ -19,6 +19,8 @@ require_relative 'engine_client'
 require_relative 'engine_supervisor'
 require_relative 'geometry/extractor'
 require_relative 'observers/live_validator'
+require_relative 'ui/browser_view'
+require_relative 'ui/history_dialog'
 require_relative 'ui/login_dialog'
 require_relative 'ui/results_dialog'
 
@@ -67,6 +69,106 @@ module Planara
     def run_validation_once
       ensure_project_setup or return
       live_validate(noisy: true)
+    end
+
+    # -- /history wiring --------------------------------------------------
+
+    # Persist the current model state as an archived run. Stores
+    # the returned report_id on Session so "Compare with last save"
+    # and "Open last report" know what to point at.
+    def save_current_run
+      return unless authenticated_and_set_up?
+
+      snapshot = extract_snapshot
+      return unless snapshot
+
+      archive = EngineClient.save_history(snapshot)
+      report_id = archive['report_id']
+      Session.last_report_id = report_id
+      Logger.info('history_saved', report_id: report_id, ok: archive['response']&.dig('ok'))
+      ::UI.messagebox("Saved. report_id: #{report_id[0, 8]}…")
+    rescue Geometry::Extractor::ExtractionError => e
+      ::UI.messagebox("Could not save: #{e.message}")
+    rescue EngineClient::EngineError => e
+      Logger.warn('history_save_failed', code: e.code, message: e.message)
+      ::UI.messagebox("Save failed: #{e.message}")
+    end
+
+    # Open the Recent runs HtmlDialog.
+    def show_history
+      return unless authenticated_and_set_up?
+      UI::HistoryDialog.show
+    end
+
+    # Save the current state, then auto-diff it against the prior
+    # run for the same project context. Opens the HTML diff in the
+    # default browser. This is the marquee "did my last edit make
+    # things better or worse?" affordance.
+    def compare_with_last_save
+      return unless authenticated_and_set_up?
+
+      snapshot = extract_snapshot
+      return unless snapshot
+
+      archive = EngineClient.save_history(snapshot)
+      report_id = archive['report_id']
+      Session.last_report_id = report_id
+
+      html = EngineClient.auto_diff_html(report_id)
+      UI::BrowserView.open_html(html, tag: 'compare')
+    rescue Geometry::Extractor::ExtractionError => e
+      ::UI.messagebox("Could not compare: #{e.message}")
+    rescue EngineClient::EngineError => e
+      if e.status == 404
+        ::UI.messagebox('No prior run exists for this project context yet — this save is your baseline.')
+      else
+        Logger.warn('history_compare_failed', code: e.code, message: e.message)
+        ::UI.messagebox("Compare failed: #{e.message}")
+      end
+    end
+
+    # Open the HTML render of the most-recently-saved run for this
+    # SketchUp session in the default browser. Stays useful even
+    # without an active server-side last-save because we cache the
+    # id on Session.
+    def open_last_report
+      return unless authenticated_and_set_up?
+
+      report_id = Session.last_report_id
+      unless report_id
+        ::UI.messagebox('No saved run yet in this session. Use "Save current run" first.')
+        return
+      end
+
+      html = EngineClient.get_history_html(report_id)
+      UI::BrowserView.open_html(html, tag: "report-#{report_id[0, 8]}")
+    rescue EngineClient::EngineError => e
+      Logger.warn('history_open_last_failed', code: e.code, message: e.message)
+      ::UI.messagebox("Could not open report: #{e.message}")
+    end
+
+    # Shared guard for menu actions that need login + project setup.
+    def authenticated_and_set_up?
+      unless Session.authenticated?
+        ::UI.messagebox('Sign in first — use "Planara — Compliance Check".')
+        return false
+      end
+      ensure_project_setup
+    end
+
+    # Extract once, returning nil and showing a friendly dialog when
+    # the model isn't shaped the way the extractor expects.
+    def extract_snapshot
+      model = Sketchup.active_model
+      Geometry::Extractor.extract(
+        model: model,
+        project: Session.project,
+        parking_slots: Session.project[:parking_slots]
+      )
+    rescue Geometry::Extractor::ExtractionError => e
+      ::UI.messagebox("Could not read the model:\n\n#{e.message}\n\n" \
+                      'Name your plot group "Plot" and floor groups "Floor 0", "Floor 1", etc.')
+      nil
     end
 
     # Internal validation step shared between the initial pass and
@@ -169,6 +271,7 @@ module Planara
       Logger.info('plugin_shutting_down')
       stop_live_loop
       UI::ResultsDialog.close
+      UI::HistoryDialog.close
       EngineSupervisor.stop
       Session.clear
     end
@@ -189,7 +292,13 @@ end
 unless file_loaded?(__FILE__)
   Planara::Boot.install_hooks
 
-  UI.menu('Plugins').add_item('Planara — Compliance Check') { Planara::Boot.activate }
+  menu = UI.menu('Plugins')
+  menu.add_item('Planara — Compliance Check')    { Planara::Boot.activate }
+  menu.add_separator
+  menu.add_item('Planara — Save current run')    { Planara::Boot.save_current_run }
+  menu.add_item('Planara — Recent runs…')        { Planara::Boot.show_history }
+  menu.add_item('Planara — Compare with last save') { Planara::Boot.compare_with_last_save }
+  menu.add_item('Planara — Open last report in browser') { Planara::Boot.open_last_report }
 
   file_loaded(__FILE__)
 end
