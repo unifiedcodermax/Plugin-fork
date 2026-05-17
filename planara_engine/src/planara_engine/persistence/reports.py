@@ -22,6 +22,7 @@ def save_report(
     *,
     user_id: int,
     archive: ArchivalReport,
+    project_id: int | None = None,
 ) -> ValidationReport:
     """Persist an ArchivalReport for ``user_id``. Returns the saved row.
 
@@ -29,6 +30,13 @@ def save_report(
     columns so list queries don't need to JSON-parse every row. The
     archive itself is stored verbatim in ``payload`` — that's the
     source of truth for re-rendering and Sprint 10 diffing.
+
+    ``project_id`` is optional: when present, the row is anchored to a
+    user-named project so auto-diff can pair runs across distinct
+    designs that share (city, classification, zone). When absent, the
+    row stays in the legacy NULL lane and auto-diff falls back to
+    context-matching. The caller is responsible for verifying the
+    project belongs to ``user_id`` — this repo trusts what it's given.
 
     Caller is responsible for ``session.commit()``.
     """
@@ -40,6 +48,7 @@ def save_report(
     row = ValidationReport(
         report_id=archive.report_id,
         user_id=user_id,
+        project_id=project_id,
         snapshot_id=archive.snapshot.snapshot_id,
         city=archive.snapshot.project.city,
         classification=archive.snapshot.project.classification,
@@ -65,6 +74,7 @@ def list_reports(
     user_id: int,
     limit: int = 20,
     offset: int = 0,
+    project_id: int | None = None,
     city: str | None = None,
     classification: str | None = None,
     zone: str | None = None,
@@ -72,11 +82,15 @@ def list_reports(
 ) -> list[ValidationReport]:
     """Most-recent-first list of a user's reports.
 
-    Filters are AND-combined. limit/offset are pagination; the route
-    layer enforces bounds (the repo accepts whatever it's given).
+    Filters are AND-combined. ``project_id`` narrows to one project's
+    history (the project picker uses this). limit/offset are
+    pagination; the route layer enforces bounds (the repo accepts
+    whatever it's given).
     """
 
     stmt = select(ValidationReport).where(ValidationReport.user_id == user_id)
+    if project_id is not None:
+        stmt = stmt.where(ValidationReport.project_id == project_id)
     if city is not None:
         stmt = stmt.where(ValidationReport.city == city)
     if classification is not None:
@@ -94,6 +108,7 @@ def count_reports(
     session: Session,
     *,
     user_id: int,
+    project_id: int | None = None,
     city: str | None = None,
     classification: str | None = None,
     zone: str | None = None,
@@ -109,6 +124,8 @@ def count_reports(
     # through a select(...) and len. The dataset stays small for the
     # MVP, so this is fine. Migrate to func.count() when it bites.
     stmt = select(ValidationReport.report_id).where(ValidationReport.user_id == user_id)
+    if project_id is not None:
+        stmt = stmt.where(ValidationReport.project_id == project_id)
     if city is not None:
         stmt = stmt.where(ValidationReport.city == city)
     if classification is not None:
@@ -146,17 +163,25 @@ def get_prior_report(
     user_id: int,
     report_id: UUID,
 ) -> ValidationReport | None:
-    """Return the most recent earlier report by the same user for the
-    same (city, classification, zone) as ``report_id``.
+    """Return the most recent earlier report by the same user that
+    shares a regression-tracking anchor with ``report_id``.
 
-    This is the 'compare with last save' anchor for the auto-diff
-    endpoint. Same-project here means same project context, not same
-    snapshot_id — every save gets a fresh snapshot_id from the plugin,
-    so identity-by-snapshot wouldn't surface a prior run.
+    Anchor selection:
+      * When the target row has a ``project_id``, prior is the most
+        recent earlier row with the SAME ``project_id``. Context
+        (city/classification/zone) is ignored here so a user can
+        legitimately re-zone a project mid-design without breaking
+        the diff lane.
+      * When the target row has NO ``project_id`` (legacy / plugin
+        not passing one), fall back to the most recent earlier row
+        with matching (city, classification, zone) AND a NULL
+        ``project_id``. Restricting the fallback to NULL keeps the
+        legacy lane from accidentally pairing with project-anchored
+        rows once a user starts using projects.
 
     Returns None when:
       * report_id doesn't exist (or belongs to another user),
-      * report_id exists but has no earlier run with matching context.
+      * report_id exists but has no earlier run on its anchor.
     """
 
     target = get_report(session, user_id=user_id, report_id=report_id)
@@ -167,12 +192,18 @@ def get_prior_report(
         select(ValidationReport)
         .where(
             ValidationReport.user_id == user_id,
+            ValidationReport.generated_at < target.generated_at,
+        )
+    )
+    if target.project_id is not None:
+        stmt = stmt.where(ValidationReport.project_id == target.project_id)
+    else:
+        stmt = stmt.where(
+            ValidationReport.project_id.is_(None),  # type: ignore[union-attr]
             ValidationReport.city == target.city,
             ValidationReport.classification == target.classification,
             ValidationReport.zone == target.zone,
-            ValidationReport.generated_at < target.generated_at,
         )
-        .order_by(col(ValidationReport.generated_at).desc())
-        .limit(1)
-    )
+
+    stmt = stmt.order_by(col(ValidationReport.generated_at).desc()).limit(1)
     return session.exec(stmt).first()

@@ -19,6 +19,7 @@ from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
 
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -74,7 +75,41 @@ def init_db() -> None:
 
     engine = get_engine()
     SQLModel.metadata.create_all(engine)
+    _apply_inline_migrations(engine)
     log.info("db_schema_ready")
+
+
+def _apply_inline_migrations(engine: Engine) -> None:
+    """Apply additive schema tweaks that ``create_all`` can't.
+
+    ``SQLModel.metadata.create_all`` creates missing tables but
+    never adds columns to existing ones. Until we adopt Alembic,
+    this function is the place to record one-line ALTERs that
+    bring a pre-existing DB up to the current schema. Each
+    migration checks for its own marker (column existence) and
+    short-circuits — so calling init_db on a fresh DB is a no-op.
+
+    Postgres deployment will replace this with Alembic; the
+    migrations here are intentionally trivial enough that the
+    swap is mechanical.
+    """
+
+    inspector = inspect(engine)
+    if not inspector.has_table("validation_reports"):
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("validation_reports")}
+    if "project_id" not in columns:
+        # Nullable column; existing rows stay NULL and auto-diff
+        # falls back to (city, classification, zone) for them.
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE validation_reports "
+                    "ADD COLUMN project_id INTEGER REFERENCES projects(id)"
+                )
+            )
+        log.info("db_migration_applied", change="validation_reports.project_id")
 
 
 def session_scope() -> Iterator[Session]:
