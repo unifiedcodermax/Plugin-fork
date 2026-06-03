@@ -9,8 +9,10 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from fastapi.exceptions import RequestValidationError
 from planara_engine.core.errors import PlanaraError
 from planara_engine.core.logging import get_logger
+
 
 
 def register_error_handlers(app: FastAPI) -> None:
@@ -46,3 +48,17 @@ def register_error_handlers(app: FastAPI) -> None:
                 }
             },
         )
+
+    @app.exception_handler(RequestValidationError)
+    async def _handle_validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        body = await _request.body()
+        log.error(
+            "validation_error",
+            errors=exc.errors(),
+            body=body.decode("utf-8", errors="replace"),
+        )
+        return JSONResponse(
+            status_code=422,
+            content={"detail": exc.errors()}
+        )
+

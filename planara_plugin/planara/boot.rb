@@ -215,7 +215,7 @@ module Planara
     # Live-loop lifecycle -------------------------------------------------
 
     def start_live_loop
-      return if @live_observer
+      stop_live_loop
 
       model = Sketchup.active_model
       return unless model
@@ -345,6 +345,14 @@ module Planara
     class ShutdownObserver < Sketchup::AppObserver
       def onQuit
         Planara::Boot.shutdown
+      end
+
+      def onOpenModel(_model)
+        Planara::Boot.start_live_loop if Planara::Session.authenticated?
+      end
+
+      def onNewModel(_model)
+        Planara::Boot.start_live_loop if Planara::Session.authenticated?
       end
     end
 
