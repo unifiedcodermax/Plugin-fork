@@ -54,6 +54,7 @@ asyncio_mode = "auto"
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:pydantic.*",
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
     # Python 3.14 + sqlite3 finalizer interplay surfaces as an
     # "unraisable" warning during Session/engine teardown even on a
     # clean rollback. Harmless in tests; ignored here so we keep
