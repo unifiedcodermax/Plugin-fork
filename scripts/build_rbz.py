@@ -198,7 +198,7 @@ def main() -> int:
     print("=" * 60)
     print()
     print(f"  Install in SketchUp:")
-    print(f"    Window → Extension Manager → Install Extension")
+    print(f"    Window -> Extension Manager -> Install Extension")
     print(f"    Select: {rbz_path}")
     print()
 
