@@ -31,6 +31,16 @@ module Planara
       ENV['PLANARA_ENGINE_CMD']
     end
 
+    # @return [String, nil] absolute path to the bundled PyInstaller
+    #   engine binary inside the plugin's bin/ directory, or nil if the
+    #   binary is not present (e.g. dev mode without a compiled engine).
+    def bundled_engine_path
+      plat = Gem.win_platform? ? 'windows' : 'macos'
+      ext  = Gem.win_platform? ? '.exe' : ''
+      path = File.join(plugin_root, 'bin', plat, 'planara-engine', "planara-engine#{ext}")
+      File.exist?(path) ? path : nil
+    end
+
     # @return [Float] seconds to wait for the engine's /health to respond
     #   after spawning the sidecar before giving up.
     def health_timeout_s

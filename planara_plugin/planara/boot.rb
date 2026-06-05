@@ -24,6 +24,7 @@ require_relative 'ui/history_dialog'
 require_relative 'ui/login_dialog'
 require_relative 'ui/project_picker'
 require_relative 'ui/results_dialog'
+require_relative 'update_checker'
 
 module Planara
   module Boot
@@ -51,6 +52,9 @@ module Planara
       else
         UI::LoginDialog.show(on_success: method(:on_authenticated))
       end
+
+      # Non-blocking check for newer releases on GitHub.
+      UpdateChecker.check_once
     end
 
     # Called once a valid JWT is stored in Session. Captures project

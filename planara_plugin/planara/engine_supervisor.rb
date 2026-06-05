@@ -76,7 +76,7 @@ module Planara
     end
 
     def spawn_engine
-      cmd = Config.engine_cmd || 'planara-engine'
+      cmd = resolve_engine_cmd
       run_dir = File.expand_path('../../.run', Config.plugin_root)
       FileUtils.mkdir_p(run_dir)
       log_path = File.join(run_dir, 'engine.log')
@@ -90,6 +90,25 @@ module Planara
         pgroup: true # so we can clean up child processes the engine itself spawned
       )
       Process.detach(@pid)
+    end
+
+    # Resolve the engine command in priority order:
+    #   1. PLANARA_ENGINE_CMD env var  (explicit override)
+    #   2. Bundled PyInstaller binary  (shipped inside the .rbz)
+    #   3. 'planara-engine' on PATH    (dev / pipx install)
+    def resolve_engine_cmd
+      if (env_cmd = Config.engine_cmd)
+        Logger.info('engine_resolve', source: 'env', cmd: env_cmd)
+        return env_cmd
+      end
+
+      if (bundled = Config.bundled_engine_path)
+        Logger.info('engine_resolve', source: 'bundled', cmd: bundled)
+        return bundled
+      end
+
+      Logger.info('engine_resolve', source: 'PATH', cmd: 'planara-engine')
+      'planara-engine'
     end
 
     def wait_for_ready

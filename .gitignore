@@ -49,3 +49,9 @@ env/
 planara_engine/.run/
 planara_engine/instance/
 formatted-history.json
+
+# PyInstaller / build artifacts
+planara_engine/dist/
+planara_engine/build/
+*.spec.bak
+planara_plugin/planara/bin/
