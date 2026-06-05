@@ -82,7 +82,7 @@ def build_engine() -> Path:
     if not engine_dist.is_dir():
         sys.exit(f"ERROR: PyInstaller output not found at {engine_dist}")
 
-    print(f"  ✓ Engine compiled → {engine_dist}")
+    print(f"  [OK] Engine compiled -> {engine_dist}")
     return engine_dist
 
 
@@ -103,7 +103,7 @@ def stage_rbz(engine_dist: Path, platform_tag: str) -> Path:
     if not src_loader.exists():
         sys.exit(f"ERROR: loader.rb not found at {src_loader}")
     shutil.copy2(src_loader, staging / "loader.rb")
-    print(f"  ✓ Copied loader.rb")
+    print(f"  [OK] Copied loader.rb")
 
     # -- 2. Copy the planara/ subfolder (Ruby plugin code) -------------------
     src_planara = PLUGIN_DIR / "planara"
@@ -113,7 +113,7 @@ def stage_rbz(engine_dist: Path, platform_tag: str) -> Path:
         dst_planara,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"),
     )
-    print(f"  ✓ Copied planara/ plugin code")
+    print(f"  [OK] Copied planara/ plugin code")
 
     # -- 3. Copy the compiled engine binary into planara/bin/<platform>/ ------
     bin_dir = dst_planara / "bin" / platform_tag / "planara-engine"
@@ -122,7 +122,7 @@ def stage_rbz(engine_dist: Path, platform_tag: str) -> Path:
         bin_dir,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
-    print(f"  ✓ Copied engine binary → planara/bin/{platform_tag}/planara-engine/")
+    print(f"  [OK] Copied engine binary -> planara/bin/{platform_tag}/planara-engine/")
 
     return staging
 
@@ -148,7 +148,7 @@ def create_rbz(staging: Path, version: str, platform_tag: str) -> Path:
                 zf.write(file_path, arcname)
 
     size_mb = rbz_path.stat().st_size / (1024 * 1024)
-    print(f"  ✓ Created {rbz_path.name}  ({size_mb:.1f} MB)")
+    print(f"  [OK] Created {rbz_path.name}  ({size_mb:.1f} MB)")
     print(f"    Path: {rbz_path}")
 
     return rbz_path
