@@ -53,7 +53,9 @@ module Planara
         # Build a file:// URL with the absolute path. Spaces and
         # non-ASCII chars in the tmpdir (eg macOS usernames) need to
         # be percent-encoded segment by segment.
-        encoded = path.split('/').map { |seg| URI.encode_www_form_component(seg) }.join('/')
+        normalized = path.tr('\\', '/')
+        normalized = "/#{normalized}" unless normalized.start_with?('/')
+        encoded = normalized.split('/').map { |seg| URI.encode_www_form_component(seg).gsub('+', '%20') }.join('/')
         "file://#{encoded}"
       end
     end
