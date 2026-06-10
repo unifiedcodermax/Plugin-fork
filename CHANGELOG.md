@@ -4,6 +4,18 @@ All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
 
+## [0.2.3] — 2026-06-10
+
+Windows compatibility patch — resolves all known issues preventing
+the plugin + engine from running on Windows.
+
+### Fixed — engine
+- SQLite database connection URL now uses POSIX-style forward slashes on Windows, preventing path misinterpretation by SQLAlchemy's SQLite driver.
+
+### Fixed — plugin
+- Engine supervisor process spawning: use `new_pgroup` instead of POSIX-only `pgroup` on Windows; send `KILL` signal directly since `TERM` is unsupported; replace `Process.getpgid` with `Process.kill(0, pid)` for process liveness checks.
+- `BrowserView` file:// URL builder: normalize backslashes to forward slashes, prepend leading `/` for Windows drive paths, and encode spaces as `%20` instead of `+`.
+
 ## [0.2.1] — 2026-06-10
 
 Patch release addressing engine startup reliability and initial authentication setup.
