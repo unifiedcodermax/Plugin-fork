@@ -77,6 +77,27 @@ def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     _apply_inline_migrations(engine)
     log.info("db_schema_ready")
+    _seed_default_user(engine)
+
+
+def _seed_default_user(engine: Engine) -> None:
+    """Auto-seed a default admin user on first boot if no users exist in the database."""
+    from sqlmodel import Session, select
+
+    from planara_engine.auth.service import register_user
+    from planara_engine.persistence.models import User
+
+    with Session(engine) as session:
+        statement = select(User)
+        any_user = session.exec(statement).first()
+        if any_user is None:
+            log.info("seeding_default_user", username="admin")
+            try:
+                register_user(session, username="admin", password="password123")
+                session.commit()
+                log.info("default_user_seeded", username="admin")
+            except Exception as exc:
+                log.error("default_user_seed_failed", error=str(exc))
 
 
 def _apply_inline_migrations(engine: Engine) -> None:

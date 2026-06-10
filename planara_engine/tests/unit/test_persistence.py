@@ -6,9 +6,10 @@ from collections.abc import Iterator
 
 import pytest
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from planara_engine.persistence.database import get_engine, init_db
+from planara_engine.persistence.models import User
 from planara_engine.persistence.repository import (
     create_user,
     get_user_by_id,
@@ -84,3 +85,66 @@ def test_touch_user_bumps_updated_at(session: Session) -> None:
     session.commit()
 
     assert u.updated_at >= original
+
+
+def test_init_db_seeds_default_user_when_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Use a clean, isolated in-memory DB URL
+    monkeypatch.setenv("PLANARA_DB_URL", "sqlite:///:memory:")
+    get_engine.cache_clear()
+
+    # On first init_db, it should seed the 'admin' user
+    init_db()
+
+    engine = get_engine()
+    with Session(engine) as s:
+        admin = get_user_by_username(s, "admin")
+        assert admin is not None
+        assert admin.username == "admin"
+        # Verify it has active status
+        assert admin.is_active is True
+
+        # Count total users
+        users = s.exec(select(User)).all()
+        assert len(users) == 1
+
+    # Call init_db again to ensure it is idempotent (does not duplicate 'admin')
+    init_db()
+    with Session(engine) as s:
+        users = s.exec(select(User)).all()
+        assert len(users) == 1
+
+    engine.dispose()
+    get_engine.cache_clear()
+
+
+def test_init_db_does_not_seed_if_users_exist(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PLANARA_DB_URL", "sqlite:///:memory:")
+    get_engine.cache_clear()
+
+    # First initialize the database tables
+    init_db()
+
+    engine = get_engine()
+    # Now manually delete the 'admin' user and add a custom user
+    with Session(engine) as s:
+        admin = get_user_by_username(s, "admin")
+        if admin:
+            s.delete(admin)
+        create_user(s, username="custom_user", password_hash="somehash")
+        s.commit()
+
+    # Call init_db again - since a user exists (custom_user), it should NOT seed 'admin'
+    init_db()
+
+    with Session(engine) as s:
+        admin = get_user_by_username(s, "admin")
+        assert admin is None
+
+        # There should only be the custom user
+        users = s.exec(select(User)).all()
+        assert len(users) == 1
+        assert users[0].username == "custom_user"
+
+    engine.dispose()
+    get_engine.cache_clear()
+
