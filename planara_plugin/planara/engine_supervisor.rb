@@ -83,9 +83,20 @@ module Planara
 
       Logger.info('engine_spawning', cmd: cmd, log: log_path)
 
+      env = {
+        'DYLD_LIBRARY_PATH' => nil,
+        'DYLD_FRAMEWORK_PATH' => nil,
+        'PYTHONPATH' => nil,
+        'PYTHONHOME' => nil,
+        'RUBYLIB' => nil,
+        'GEM_HOME' => nil,
+        'GEM_PATH' => nil
+      }
+
       @pid = Process.spawn(
-        cmd,
-        out: log_path,
+        env,
+        [cmd, cmd],
+        out: [log_path, 'w'],
         err: [:child, :out],
         pgroup: true # so we can clean up child processes the engine itself spawned
       )
