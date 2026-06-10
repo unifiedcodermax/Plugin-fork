@@ -39,7 +39,7 @@ module Planara
       begin
         EngineSupervisor.start
       rescue StandardError => e
-        UI.messagebox(
+        ::UI.messagebox(
           "Planara could not start its compliance engine:\n\n#{e.message}\n\n" \
           "Make sure the planara-engine command is installed and on PATH " \
           "(or set PLANARA_ENGINE_CMD)."

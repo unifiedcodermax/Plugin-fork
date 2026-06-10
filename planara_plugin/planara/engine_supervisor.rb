@@ -90,7 +90,8 @@ module Planara
         'PYTHONHOME' => nil,
         'RUBYLIB' => nil,
         'GEM_HOME' => nil,
-        'GEM_PATH' => nil
+        'GEM_PATH' => nil,
+        'PLANARA_ENV' => 'prod'
       }
 
       @pid = Process.spawn(
