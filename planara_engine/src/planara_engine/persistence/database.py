@@ -49,7 +49,7 @@ def get_engine() -> Engine:
         if not db_path.is_absolute():
             db_path = settings.project_root / db_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        url = f"sqlite:///{db_path}"
+        url = f"sqlite:///{db_path.as_posix()}"
 
     # check_same_thread=False is required when sharing the engine
     # across FastAPI's threadpool; SQLAlchemy still serializes
