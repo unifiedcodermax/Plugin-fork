@@ -94,12 +94,20 @@ module Planara
         'PLANARA_ENV' => 'prod'
       }
 
+      opts = {
+        out: [log_path, 'w'],
+        err: [:child, :out]
+      }
+      if Gem.win_platform?
+        opts[:new_pgroup] = true
+      else
+        opts[:pgroup] = true
+      end
+
       @pid = Process.spawn(
         env,
         [cmd, cmd],
-        out: [log_path, 'w'],
-        err: [:child, :out],
-        pgroup: true # so we can clean up child processes the engine itself spawned
+        opts
       )
       Process.detach(@pid)
     end
@@ -140,21 +148,36 @@ module Planara
     end
 
     def kill_pid(pid)
-      Process.kill('TERM', pid)
+      sig = Gem.win_platform? ? 'KILL' : 'TERM'
+      Process.kill(sig, pid)
       deadline = Time.now + STOP_GRACE_S
       while Time.now < deadline
         return if process_dead?(pid)
         sleep 0.1
       end
-      Logger.warn('engine_kill_force', pid: pid)
-      Process.kill('KILL', pid)
+      unless Gem.win_platform?
+        Logger.warn('engine_kill_force', pid: pid)
+        Process.kill('KILL', pid)
+      end
     rescue Errno::ESRCH, Errno::ECHILD
       # Already gone; fine.
     end
 
     def process_dead?(pid)
-      Process.getpgid(pid)
-      false
+      if Gem.win_platform?
+        begin
+          Process.kill(0, pid)
+          false
+        rescue Errno::ESRCH
+          true
+        rescue
+          # In case of EPERM or EINVAL, assume the process exists but is not dead
+          false
+        end
+      else
+        Process.getpgid(pid)
+        false
+      end
     rescue Errno::ESRCH
       true
     end
