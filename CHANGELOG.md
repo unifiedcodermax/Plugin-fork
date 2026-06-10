@@ -4,6 +4,18 @@ All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
 
+## [0.2.1] — 2026-06-10
+
+Patch release addressing engine startup reliability and initial authentication setup.
+
+### Added
+- Automatic database seeding: on first launch, if no users exist in the local SQLite database, a default admin user is created (`admin` / `password123`).
+- Login hint in user interface showing the default local admin credentials.
+
+### Fixed
+- Plugin engine supervisor path execution bug: resolve crashes/spawning failures when Planara is installed under directories containing spaces (such as `Application Support`).
+- Environment variable sanitization when spawning python engine sidecar, preventing pollution from SketchUp's internal runtime.
+
 ## [0.2.0] — 2026-05-17
 
 The persistence + regression-tracking release. `/validate` is now
