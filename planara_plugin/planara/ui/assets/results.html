@@ -17,6 +17,9 @@
       --warning-fg: #7a5b00;
       --ok-bg: #e7f7e8;
       --ok-fg: #167314;
+      --banner-bg: #fff0f0;
+      --banner-fg: #b91c1c;
+      --banner-border: #fca5a5;
     }
     * { box-sizing: border-box; }
     body {
@@ -75,9 +78,31 @@
     .pill.error { background: var(--error-bg); color: var(--error-fg); }
     .pill.warning { background: var(--warning-bg); color: var(--warning-fg); }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+    .error-banner {
+      display: none;
+      padding: 10px 14px;
+      margin: 0 0 12px 0;
+      border-radius: 6px;
+      border: 1px solid var(--banner-border);
+      background: var(--banner-bg);
+      color: var(--banner-fg);
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+    .error-banner.visible { display: block; }
+    .error-banner .icon { margin-right: 6px; }
+    .error-banner .hint {
+      display: block;
+      margin-top: 4px;
+      font-weight: 400;
+      font-size: 11px;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
+  <div id="error-banner" class="error-banner"></div>
   <h1>Live compliance</h1>
   <div id="meta" class="meta"></div>
   <div id="summary" class="summary empty">Waiting for first validation…</div>
@@ -110,6 +135,9 @@
     }
 
     Planara.onResult = function (payload) {
+      // A successful result clears any error banner.
+      Planara.clearError();
+
       var ok = payload.ok;
       var violations = payload.violations || [];
       var metrics = payload.metrics || {};
@@ -143,6 +171,27 @@
         body.appendChild(tr);
       });
       table.style.display = '';
+    };
+
+    // Show a persistent error banner at the top of the panel.
+    // payload: { error_type: "extraction" | "engine", message: "..." }
+    Planara.onError = function (payload) {
+      var banner = document.getElementById('error-banner');
+      var msg = escapeHtml(payload.message || 'An error occurred.');
+      var hint = '';
+      if (payload.error_type === 'extraction') {
+        hint = '<span class="hint">Fix the geometry and the check will re-run automatically.</span>';
+      } else if (payload.error_type === 'engine') {
+        hint = '<span class="hint">The compliance engine may be restarting. It will retry automatically.</span>';
+      }
+      banner.innerHTML = '<span class="icon">⚠️</span>' + msg + hint;
+      banner.classList.add('visible');
+    };
+
+    Planara.clearError = function () {
+      var banner = document.getElementById('error-banner');
+      banner.classList.remove('visible');
+      banner.innerHTML = '';
     };
 
     function escapeHtml(s) {

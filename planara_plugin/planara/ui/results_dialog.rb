@@ -34,10 +34,23 @@ module Planara
         push(response) if @dialog.visible?
       end
 
+      # Push an error state into the dialog.  The banner appears
+      # at the top of the panel and auto-clears on the next
+      # successful ``update``.
+      #
+      # @param error_type [String] "extraction" or "engine"
+      # @param message [String] human-readable error description
+      def update_error(error_type:, message:)
+        ensure_dialog
+        @last_error = { error_type: error_type, message: message }
+        push_error(@last_error) if @dialog.visible?
+      end
+
       def close
         @dialog&.close
         @dialog = nil
         @last_payload = nil
+        @last_error = nil
       end
 
       # -- internals -----------------------------------------------------------
@@ -60,6 +73,7 @@ module Planara
         # macOS — a push fired before DOM-ready is silently lost).
         @dialog.add_action_callback('ready') do |_, _|
           push(@last_payload) if @last_payload
+          push_error(@last_error) if @last_error
         end
       end
 
@@ -69,6 +83,14 @@ module Planara
         @dialog.execute_script(js)
       rescue StandardError => e
         Planara::Logger.warn('results_push_failed', error: e.message)
+      end
+
+      def push_error(error)
+        return unless @dialog && error
+        js = "Planara.onError(#{JSON.generate(error)});"
+        @dialog.execute_script(js)
+      rescue StandardError => e
+        Planara::Logger.warn('results_push_error_failed', error: e.message)
       end
     end
   end
