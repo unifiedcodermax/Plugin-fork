@@ -4,6 +4,15 @@ All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
 
+## [0.2.4] — 2026-06-11
+
+Feature release eliminating manual setup and surfacing live validation errors.
+
+### Added
+- Auto-discovery for Plot and Floor groups. When opening an existing SketchUp model with unnamed groups, the plugin uses heuristics (largest ground-level face, distinct Z-levels) to identify the plot and floors automatically, and renames them to lock in the fast path for subsequent runs.
+- Live error surfacing: Extraction and engine errors now display as a persistent, actionable banner at the top of the Results panel, giving the architect immediate feedback during live editing without blocking popups.
+- Auto-validation on file open: Pre-built `.skp` files are evaluated immediately upon opening if the user is authenticated.
+
 ## [0.2.3] — 2026-06-10
 
 Windows compatibility patch — resolves all known issues preventing
