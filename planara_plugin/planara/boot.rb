@@ -186,8 +186,9 @@ module Planara
 
     # Internal validation step shared between the initial pass and
     # the live-loop observer. When ``noisy`` is true, extraction/
-    # transport errors pop a dialog; otherwise they only log, so the
-    # observer doesn't spam dialogs during normal editing.
+    # transport errors also pop a dialog; otherwise they are pushed
+    # to the Results panel's error banner so the architect gets
+    # immediate feedback without modal interruptions.
     def live_validate(noisy: false)
       model = Sketchup.active_model
       snapshot = Geometry::Extractor.extract(
@@ -207,12 +208,14 @@ module Planara
       show_validation_result(response)
     rescue Geometry::Extractor::ExtractionError => e
       Logger.warn('extract_failed', error: e.message, noisy: noisy)
+      UI::ResultsDialog.update_error(error_type: 'extraction', message: e.message)
       if noisy
         ::UI.messagebox("Could not read the model:\n\n#{e.message}\n\n" \
                         'Name your plot group "Plot" and floor groups "Floor 0", "Floor 1", etc.')
       end
     rescue EngineClient::EngineError => e
       Logger.warn('validate_failed', code: e.code, message: e.message, noisy: noisy)
+      UI::ResultsDialog.update_error(error_type: 'engine', message: e.message)
       ::UI.messagebox("Validation failed: #{e.message}") if noisy
     end
 
@@ -352,11 +355,19 @@ module Planara
       end
 
       def onOpenModel(_model)
-        Planara::Boot.start_live_loop if Planara::Session.authenticated?
+        if Planara::Session.authenticated?
+          Planara::Boot.start_live_loop
+          # Auto-validate the newly-opened model so pre-built SKP
+          # files show results immediately without a menu click.
+          Planara::Boot.live_validate(noisy: false) if Planara::Session.project_ready?
+        end
       end
 
       def onNewModel(_model)
-        Planara::Boot.start_live_loop if Planara::Session.authenticated?
+        if Planara::Session.authenticated?
+          Planara::Boot.start_live_loop
+          Planara::Boot.live_validate(noisy: false) if Planara::Session.project_ready?
+        end
       end
     end
 
