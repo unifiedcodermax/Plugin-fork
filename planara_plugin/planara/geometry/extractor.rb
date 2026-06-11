@@ -9,32 +9,26 @@ module Planara
   module Geometry
     # Extracts a Snapshot payload from the active SketchUp model.
     #
-    # Discovery rules (deliberately conservative for the MVP):
+    # Discovery rules:
     #
-    #   PLOT
-    #     - Looks for a Sketchup::Group OR Sketchup::ComponentInstance
-    #       at the top level whose ``name`` matches /^plot$/i.
-    #     - Inside it, picks the single horizontal Sketchup::Face
-    #       (normal parallel to Z) with the LARGEST area as the
-    #       plot polygon.
-    #     - Z-coordinates are dropped; we treat the plot as 2D.
+    #   PLOT  (two-pass)
+    #     1. STRICT — top-level Group/ComponentInstance named /^plot$/i.
+    #     2. FALLBACK — the top-level group containing the largest
+    #        horizontal face at Z ≈ 0.  When fallback fires, the
+    #        group is auto-renamed "Plot" so subsequent runs use
+    #        the fast path.
     #
-    #   FLOORS
-    #     - Top-level groups/components named "Floor N" (case-insensitive,
-    #       any whitespace). Numeric N becomes Floor.level.
-    #     - The largest horizontal face inside becomes Floor.polygon.
-    #     - height_m comes from the Z-extent of the group's bounding
-    #       box. Default 3.0 m when degenerate.
-    #     - is_habitable defaults to true. If the group/component has
-    #       an attribute ``planara/is_habitable`` set to "false" we
-    #       honor it — lets users mark stilts/services without
-    #       rebuilding the extractor.
+    #   FLOORS  (two-pass)
+    #     1. STRICT — groups named "Floor N" (case-insensitive).
+    #     2. FALLBACK — top-level groups (excluding the plot) that
+    #        contain at least one horizontal face.  Sorted by the
+    #        minimum Z of their bounding box; levels assigned 0, 1,
+    #        2, …  Each is auto-renamed "Floor N".
     #
-    # When discovery fails (no plot or no floors), the extractor
-    # raises ExtractionError with a message the plugin UI surfaces.
-    # Future sprints will add fallbacks (selection-based plot input,
-    # face-based floor inference) — this strict version is the
-    # foundation that ships in the MVP demo.
+    # Auto-renaming is wrapped inside the model's existing undo
+    # context (if one is active) or a new "Planara auto-detect"
+    # operation, so the user can Undo if the heuristic grabbed
+    # the wrong geometry.
     module Extractor
       class ExtractionError < StandardError; end
 
@@ -44,6 +38,10 @@ module Planara
       # Wire-format version the plugin emits. The engine accepts and
       # warns on mismatch; bump alongside any non-additive change.
       SCHEMA_VERSION = '1.0'
+
+      # Z-tolerance for "at ground level" in inches.  Faces whose
+      # min-Z is within this value of 0 are considered ground-level.
+      GROUND_Z_TOLERANCE_IN = 1.0
 
       module_function
 
@@ -58,10 +56,12 @@ module Planara
       def extract(model:, project:, parking_slots: 0)
         raise ExtractionError, 'no active model' unless model
 
-        plot = find_plot(model)
+        plot = find_plot(model) || find_plot_fallback(model)
+        raise ExtractionError, 'no plot found — name a group "Plot" or draw a closed ground-level polygon inside a group' unless plot
+
         floors = find_floors(model)
-        raise ExtractionError, 'no plot group/component named "Plot" found' unless plot
-        raise ExtractionError, 'no floors found (expected groups named "Floor 0", "Floor 1", ...)' if floors.empty?
+        floors = find_floors_fallback(model, plot) if floors.empty?
+        raise ExtractionError, 'no floors found — name groups "Floor 0", "Floor 1", … or create groups with horizontal faces above the plot' if floors.empty?
 
         plot_polygon = polygon_from(plot)
         raise ExtractionError, 'plot has no horizontal face' unless plot_polygon
@@ -113,7 +113,7 @@ module Planara
         }
       end
 
-      # -- discovery -----------------------------------------------------------
+      # -- strict discovery ----------------------------------------------------
 
       def find_plot(model)
         model.entities.find do |e|
@@ -133,6 +133,62 @@ module Planara
         end
         out.sort_by!(&:first)
         out
+      end
+
+      # -- fallback discovery --------------------------------------------------
+
+      # Find the top-level group/component with the largest horizontal
+      # face at ground level (Z ≈ 0).  Auto-renames it "Plot".
+      def find_plot_fallback(model)
+        candidates = top_level_groups(model)
+        best = nil
+        best_area = 0
+
+        candidates.each do |entity|
+          faces = inner_entities(entity).grep(Sketchup::Face)
+          horiz = faces.select { |f| horizontal?(f) }
+          horiz.each do |face|
+            # Check the face is at ground level (all vertices Z ≈ 0)
+            min_z = face.vertices.map { |v| v.position.z }.min.abs
+            next unless min_z <= GROUND_Z_TOLERANCE_IN
+            if face.area > best_area
+              best_area = face.area
+              best = entity
+            end
+          end
+        end
+
+        return nil unless best
+
+        auto_rename(model, best, 'Plot')
+        Logger.info('auto_detect_plot', entity_id: best.persistent_id, area_sq_in: best_area.round(2))
+        best
+      end
+
+      # Discover floor-like groups by looking for top-level
+      # groups/components (excluding the plot) that contain at
+      # least one horizontal face.  Sort by bounding-box min-Z
+      # and assign levels 0, 1, 2, …  Auto-renames each.
+      def find_floors_fallback(model, plot_entity)
+        candidates = top_level_groups(model).reject { |e| e == plot_entity }
+
+        # Keep only groups that contain at least one horizontal face
+        with_faces = candidates.select do |entity|
+          inner_entities(entity).grep(Sketchup::Face).any? { |f| horizontal?(f) }
+        end
+
+        return [] if with_faces.empty?
+
+        # Sort by the bottom of their bounding box (lowest Z first)
+        sorted = with_faces.sort_by { |e| e.bounds.min.z }
+
+        floors = []
+        sorted.each_with_index do |entity, idx|
+          auto_rename(model, entity, "Floor #{idx}")
+          Logger.info('auto_detect_floor', level: idx, entity_id: entity.persistent_id)
+          floors << [idx, entity]
+        end
+        floors
       end
 
       # -- polygon extraction --------------------------------------------------
@@ -202,6 +258,45 @@ module Planara
         return false if raw.to_s.downcase == 'false'
         return true if raw.to_s.downcase == 'true'
         raw
+      end
+
+      # All top-level groups and component instances in the model.
+      def top_level_groups(model)
+        model.entities.select do |e|
+          e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+        end
+      end
+
+      # Rename an entity inside an undo-able operation.  If there's
+      # already a model operation in progress (e.g. the live-validate
+      # observer fired inside a transaction commit), we just set the
+      # name directly — SketchUp batches it into the user's current
+      # undo step.
+      def auto_rename(model, entity, new_name)
+        old_name = entity_name(entity)
+        return if old_name == new_name
+
+        # SketchUp raises if you start_operation inside another one.
+        # The safest pattern: attempt start; if it raises, we're
+        # already inside one — just set the name.
+        began = false
+        begin
+          model.start_operation('Planara auto-detect', true)
+          began = true
+        rescue StandardError
+          # Already inside an operation — that's fine.
+        end
+
+        if entity.is_a?(Sketchup::Group)
+          entity.name = new_name
+        elsif entity.is_a?(Sketchup::ComponentInstance)
+          entity.name = new_name
+        end
+
+        model.commit_operation if began
+      rescue StandardError => e
+        Logger.warn('auto_rename_failed', entity: old_name, new_name: new_name, error: e.message)
+        model.abort_operation if began
       end
     end
   end
