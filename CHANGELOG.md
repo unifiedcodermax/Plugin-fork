@@ -4,6 +4,14 @@ All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
 
+## [0.2.5] — 2026-06-12
+
+Bug fix release for the live compliance dialog.
+
+### Fixed
+- **UI Race Condition:** The results dialog now correctly hooks into the native `HtmlDialog` close event via `set_on_closed` and uses `reset_dialog_ref` to clean up internal references, preventing the application from hanging on "Waiting for first validation..." when reopened.
+- **Session State:** Closing the live compliance dialog now stops the background live validation loop and clears `Session.project` metadata. This forces the plugin to re-prompt for project details (City, Classification, Zone) on the next run, ensuring a fresh session.
+
 ## [0.2.4] — 2026-06-11
 
 Feature release eliminating manual setup and surfacing live validation errors.
