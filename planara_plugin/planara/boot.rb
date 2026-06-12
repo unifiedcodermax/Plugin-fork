@@ -348,6 +348,18 @@ module Planara
       Session.clear
     end
 
+    # Called when the user closes the Live compliance dialog via the
+    # window's X button. Tears down the live-loop and clears the
+    # project metadata so the next "Planara — Compliance Check"
+    # re-prompts for project details (City, Classification, Zone,
+    # Overlays, Parking) before running the engine again.
+    def on_dialog_closed
+      Logger.info('results_dialog_closed_by_user')
+      stop_live_loop
+      Session.project = nil
+      UI::ResultsDialog.reset_dialog_ref
+    end
+
     # AppObserver that forwards SketchUp's lifecycle to Boot.shutdown.
     class ShutdownObserver < Sketchup::AppObserver
       def onQuit
