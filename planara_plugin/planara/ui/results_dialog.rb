@@ -53,6 +53,16 @@ module Planara
         @last_error = nil
       end
 
+      # Clean up internal references after the user has already closed
+      # the dialog via the window's close button. Unlike ``close``,
+      # this does NOT call ``@dialog.close`` because the native window
+      # is already gone.
+      def reset_dialog_ref
+        @dialog = nil
+        @last_payload = nil
+        @last_error = nil
+      end
+
       # -- internals -----------------------------------------------------------
 
       def ensure_dialog
@@ -75,6 +85,12 @@ module Planara
           push(@last_payload) if @last_payload
           push_error(@last_error) if @last_error
         end
+
+        # When the user closes the dialog via the window's X button,
+        # notify Boot so it can tear down the live-loop and clear
+        # Session.project — the next "Compliance Check" will re-prompt
+        # for project details.
+        @dialog.set_on_closed { Planara::Boot.on_dialog_closed }
       end
 
       def push(payload)
