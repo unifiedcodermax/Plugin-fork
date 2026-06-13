@@ -9,8 +9,11 @@ from planara_engine.compliance import (
     coverage,  # noqa: F401 — side-effect import
     fsi,  # noqa: F401 — side-effect import
     height,  # noqa: F401 — side-effect import
+    lift_required,  # noqa: F401 — side-effect import
     parking,  # noqa: F401 — side-effect import
+    room_height,  # noqa: F401 — side-effect import
     setback,  # noqa: F401 — side-effect import
 )
 
 __all__: list[str] = []
+

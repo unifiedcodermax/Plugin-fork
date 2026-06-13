@@ -63,6 +63,14 @@ class Building(BaseModel):
     floors: list[Floor] = Field(min_length=1)
     total_height_m: float | None = Field(default=None, gt=0.0)
     parking_slots_provided: int = Field(default=0, ge=0)
+    has_lift: bool = Field(
+        default=False,
+        description=(
+            "Whether the building provides a lift/elevator. "
+            "Required for buildings >= 15m or > G+3 floors "
+            "(Bangalore Byelaw 20.7)."
+        ),
+    )
 
     @model_validator(mode="after")
     def _unique_levels(self) -> Building:
