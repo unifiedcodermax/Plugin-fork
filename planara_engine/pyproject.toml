@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "planara-engine"
-version = "0.3.0"
+version = "0.3.1"
 description = "Planara compliance engine — FastAPI service that validates building designs against municipal byelaws."
 readme = "README.md"
 requires-python = ">=3.11"
