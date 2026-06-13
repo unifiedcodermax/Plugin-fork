@@ -1,17 +1,17 @@
 {
   "Heritage": {
-    "Residential": 1.0,
-    "Commercial": 1.5,
-    "Industry": 0.8
+    "Residential": 1.25,
+    "Commercial": 1.50,
+    "Industry": 0.75
   },
   "CBD": {
-    "Residential": 2.5,
-    "Commercial": 4.0,
-    "Industry": 3.0
+    "Residential": 1.75,
+    "Commercial": 1.75,
+    "Industry": 0.75
   },
   "HDZ": {
-    "Residential": 1.2,
-    "Commercial": 2.0,
-    "Industry": 1.5
+    "Residential": 2.00,
+    "Commercial": 2.00,
+    "Industry": 0.75
   }
-} 
+}

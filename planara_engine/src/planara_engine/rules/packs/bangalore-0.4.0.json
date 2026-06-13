@@ -1,0 +1,333 @@
+{
+  "city": "Bangalore",
+  "version": "0.4.0",
+  "description": "Aligned with Bangalore Building Byelaws 2003. Heritage→Intensely Developed Area (A), CBD→Moderately Developed Area (B), HDZ→Sparsely Developed Area (C). FAR from Table 6, setbacks from Tables 4 & 5, coverage from Table 6, parking from Table 13, industrial from Table 10.",
+  "rules": [
+    {
+      "id": "blr.fsi.heritage.residential",
+      "category": "fsi",
+      "applies_when": { "classification": "Heritage", "zone": "Residential" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.25, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Heritage/Residential limit of {max_fsi} (Byelaw Table 6, Intensely Developed Area). Built-up: {built_up_m2} m² on a {plot_area_m2} m² plot."
+    },
+    {
+      "id": "blr.fsi.heritage.commercial",
+      "category": "fsi",
+      "applies_when": { "classification": "Heritage", "zone": "Commercial" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.50, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Heritage/Commercial limit of {max_fsi} (Byelaw Table 6, Intensely Developed Area)."
+    },
+    {
+      "id": "blr.fsi.heritage.industry",
+      "category": "fsi",
+      "applies_when": { "classification": "Heritage", "zone": "Industry" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 0.75 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the Heritage/Industry limit of {max_fsi} (Byelaw Table 10, Industrial buildings)."
+    },
+    {
+      "id": "blr.fsi.cbd.residential",
+      "category": "fsi",
+      "applies_when": { "classification": "CBD", "zone": "Residential" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.75, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the CBD/Residential limit of {max_fsi} (Byelaw Table 6, Moderately Developed Area)."
+    },
+    {
+      "id": "blr.fsi.cbd.commercial",
+      "category": "fsi",
+      "applies_when": { "classification": "CBD", "zone": "Commercial" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 1.75, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the CBD/Commercial limit of {max_fsi} (Byelaw Table 6, Moderately Developed Area)."
+    },
+    {
+      "id": "blr.fsi.cbd.industry",
+      "category": "fsi",
+      "applies_when": { "classification": "CBD", "zone": "Industry" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 0.75 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the CBD/Industry limit of {max_fsi} (Byelaw Table 10, Industrial buildings)."
+    },
+    {
+      "id": "blr.fsi.hdz.residential",
+      "category": "fsi",
+      "applies_when": { "classification": "HDZ", "zone": "Residential" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 2.00, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the HDZ/Residential limit of {max_fsi} (Byelaw Table 6, Sparsely Developed Area)."
+    },
+    {
+      "id": "blr.fsi.hdz.commercial",
+      "category": "fsi",
+      "applies_when": { "classification": "HDZ", "zone": "Commercial" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 2.00, "warn_within_pct": 0.1 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the HDZ/Commercial limit of {max_fsi} (Byelaw Table 6, Sparsely Developed Area)."
+    },
+    {
+      "id": "blr.fsi.hdz.industry",
+      "category": "fsi",
+      "applies_when": { "classification": "HDZ", "zone": "Industry" },
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 0.75 },
+      "severity": "error",
+      "message_template": "FSI {fsi} exceeds the HDZ/Industry limit of {max_fsi} (Byelaw Table 10, Industrial buildings)."
+    },
+
+    {
+      "id": "blr.setback.heritage.residential",
+      "category": "setback",
+      "applies_when": { "classification": "Heritage", "zone": "Residential" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 1.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (Heritage/Residential requires min {min_setback_m} m per Byelaw Table 4). Note: actual setbacks vary by plot depth/width and side."
+    },
+    {
+      "id": "blr.setback.heritage.commercial",
+      "category": "setback",
+      "applies_when": { "classification": "Heritage", "zone": "Commercial" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 1.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (Heritage/Commercial requires min {min_setback_m} m per Byelaw Table 4)."
+    },
+    {
+      "id": "blr.setback.heritage.industry",
+      "category": "setback",
+      "applies_when": { "classification": "Heritage", "zone": "Industry" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 1.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (Heritage/Industry requires min {min_setback_m} m per Byelaw Table 10)."
+    },
+    {
+      "id": "blr.setback.cbd.residential",
+      "category": "setback",
+      "applies_when": { "classification": "CBD", "zone": "Residential" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 1.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (CBD/Residential requires min {min_setback_m} m per Byelaw Table 4)."
+    },
+    {
+      "id": "blr.setback.cbd.commercial",
+      "category": "setback",
+      "applies_when": { "classification": "CBD", "zone": "Commercial" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 1.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (CBD/Commercial requires min {min_setback_m} m per Byelaw Table 4)."
+    },
+    {
+      "id": "blr.setback.cbd.industry",
+      "category": "setback",
+      "applies_when": { "classification": "CBD", "zone": "Industry" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 1.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (CBD/Industry requires min {min_setback_m} m per Byelaw Table 10)."
+    },
+    {
+      "id": "blr.setback.hdz.residential",
+      "category": "setback",
+      "applies_when": { "classification": "HDZ", "zone": "Residential" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 1.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (HDZ/Residential requires min {min_setback_m} m per Byelaw Table 4)."
+    },
+    {
+      "id": "blr.setback.hdz.commercial",
+      "category": "setback",
+      "applies_when": { "classification": "HDZ", "zone": "Commercial" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 1.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (HDZ/Commercial requires min {min_setback_m} m per Byelaw Table 4)."
+    },
+    {
+      "id": "blr.setback.hdz.industry",
+      "category": "setback",
+      "applies_when": { "classification": "HDZ", "zone": "Industry" },
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 1.0 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (HDZ/Industry requires min {min_setback_m} m per Byelaw Table 10)."
+    },
+
+    {
+      "id": "blr.setback.highrise",
+      "category": "setback",
+      "applies_when": {},
+      "evaluator": "setback_min_distance",
+      "params": { "min_setback_m": 4.5, "apply_from_level": 4 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} is only {min_distance_m} m from the plot boundary (buildings above 9.5m require min {min_setback_m} m all-round per Byelaw Table 5)."
+    },
+
+    {
+      "id": "blr.coverage.residential",
+      "category": "coverage",
+      "applies_when": { "zone": "Residential" },
+      "evaluator": "ground_coverage_pct",
+      "params": { "max_coverage_pct": 65.0 },
+      "severity": "error",
+      "message_template": "Ground coverage {coverage_pct}% exceeds the Residential limit of {max_coverage_pct}% (Byelaw Table 6)."
+    },
+    {
+      "id": "blr.coverage.commercial",
+      "category": "coverage",
+      "applies_when": { "zone": "Commercial" },
+      "evaluator": "ground_coverage_pct",
+      "params": { "max_coverage_pct": 65.0 },
+      "severity": "error",
+      "message_template": "Ground coverage {coverage_pct}% exceeds the Commercial limit of {max_coverage_pct}% (Byelaw Table 6)."
+    },
+    {
+      "id": "blr.coverage.industry",
+      "category": "coverage",
+      "applies_when": { "zone": "Industry" },
+      "evaluator": "ground_coverage_pct",
+      "params": { "max_coverage_pct": 75.0 },
+      "severity": "error",
+      "message_template": "Ground coverage {coverage_pct}% exceeds the Industry limit of {max_coverage_pct}% (Byelaw Table 10, service industry)."
+    },
+
+    {
+      "id": "blr.open_space.residential",
+      "category": "open_space",
+      "applies_when": { "zone": "Residential" },
+      "evaluator": "open_space_pct",
+      "params": { "min_open_space_pct": 15.0 },
+      "severity": "error",
+      "message_template": "Open space {open_space_pct}% is below the Residential minimum of {min_open_space_pct}% (Byelaw 12.1 vi — 15% minimum for parks and open space)."
+    },
+    {
+      "id": "blr.open_space.commercial",
+      "category": "open_space",
+      "applies_when": { "zone": "Commercial" },
+      "evaluator": "open_space_pct",
+      "params": { "min_open_space_pct": 15.0 },
+      "severity": "error",
+      "message_template": "Open space {open_space_pct}% is below the Commercial minimum of {min_open_space_pct}%."
+    },
+    {
+      "id": "blr.open_space.industry",
+      "category": "open_space",
+      "applies_when": { "zone": "Industry" },
+      "evaluator": "open_space_pct",
+      "params": { "min_open_space_pct": 15.0 },
+      "severity": "error",
+      "message_template": "Open space {open_space_pct}% is below the Industry minimum of {min_open_space_pct}%."
+    },
+
+    {
+      "id": "blr.parking.residential",
+      "category": "parking",
+      "applies_when": { "zone": "Residential" },
+      "evaluator": "parking_slots_required",
+      "params": { "m2_per_slot": 100.0, "visitor_pct": 10.0 },
+      "severity": "error",
+      "message_template": "Parking: {parking_slots_provided} provided, {parking_slots_required} required ({primary_slots} primary + {visitor_slots} visitor at 1 slot per {m2_per_slot} m², Byelaw Table 13 sl.10)."
+    },
+    {
+      "id": "blr.parking.commercial",
+      "category": "parking",
+      "applies_when": { "zone": "Commercial" },
+      "evaluator": "parking_slots_required",
+      "params": { "m2_per_slot": 50.0, "visitor_pct": 10.0 },
+      "severity": "error",
+      "message_template": "Parking: {parking_slots_provided} provided, {parking_slots_required} required ({primary_slots} primary + {visitor_slots} visitor at 1 slot per {m2_per_slot} m², Byelaw Table 13 sl.2/6)."
+    },
+    {
+      "id": "blr.parking.industry",
+      "category": "parking",
+      "applies_when": { "zone": "Industry" },
+      "evaluator": "parking_slots_required",
+      "params": { "m2_per_slot": 100.0 },
+      "severity": "error",
+      "message_template": "Parking: {parking_slots_provided} provided, {parking_slots_required} required (1 slot per {m2_per_slot} m², Byelaw Table 13 sl.8)."
+    },
+
+    {
+      "id": "blr.overlay.airport.height",
+      "category": "height",
+      "applies_when": { "overlay": "airport" },
+      "evaluator": "height_limit",
+      "params": { "max_height_m": 45.0 },
+      "severity": "error",
+      "message_template": "Building height {height_m} m exceeds the airport approach-surface limit of {max_height_m} m (Byelaw Table 12, 15.3)."
+    },
+    {
+      "id": "blr.overlay.heritage_influence.height",
+      "category": "height",
+      "applies_when": { "overlay": "heritage_influence" },
+      "evaluator": "height_limit",
+      "params": { "max_height_m": 12.0 },
+      "severity": "error",
+      "message_template": "Building height {height_m} m exceeds the heritage-influence skyline limit of {max_height_m} m."
+    },
+
+    {
+      "id": "blr.room_height.habitable",
+      "category": "room_height",
+      "applies_when": {},
+      "evaluator": "min_room_height",
+      "params": { "min_height_m": 2.75 },
+      "severity": "error",
+      "message_template": "Floor {violating_level} has height {violating_height_m} m, below the minimum habitable room height of {min_height_m} m (Byelaw 20.1(2))."
+    },
+
+    {
+      "id": "blr.lift.required",
+      "category": "lift",
+      "applies_when": {},
+      "evaluator": "lift_required",
+      "params": { "height_threshold_m": 15.0, "floor_threshold": 4 },
+      "severity": "warning",
+      "message_template": "Building has {above_grade_floors} above-grade floors and height {height_m} m. Lift provision is required for buildings ≥{height_threshold_m} m or with more than G+3 floors (Byelaw 20.7). has_lift={has_lift}."
+    },
+
+    {
+      "id": "blr.far_exemptions.info",
+      "category": "fsi",
+      "applies_when": {},
+      "evaluator": "fsi_limit",
+      "params": { "max_fsi": 999.0 },
+      "severity": "info",
+      "message_template": "FAR exemptions (Byelaw 9.10.3b): parking, staircases, lift rooms, ramps, escalators, machine rooms, open balconies, ducts, water tanks are excluded from FAR calculation. Mark non-habitable floors with is_habitable=false."
+    },
+
+    {
+      "id": "blr.plinth.info",
+      "category": "plinth",
+      "applies_when": {},
+      "evaluator": "height_limit",
+      "params": { "max_height_m": 999.0 },
+      "severity": "info",
+      "message_template": "Minimum plinth height: 0.45 m above surrounding ground level (Byelaw 19.1). Basement projection must not exceed 1.0 m above average ground level."
+    },
+
+    {
+      "id": "blr.fire_safety.info",
+      "category": "fire_safety",
+      "applies_when": {},
+      "evaluator": "height_limit",
+      "params": { "max_height_m": 999.0 },
+      "severity": "info",
+      "message_template": "Fire safety: Buildings with G+4 floors and above (or height ≥15 m) require clearance from Director of Fire Services (Byelaw 23.1.1)."
+    }
+  ]
+}
