@@ -312,24 +312,32 @@ module Planara
     end
 
     def prompt_project_setup
+      # Classification maps to Bangalore Building Byelaws 2003 area types:
+      #   Heritage → Area A (Intensely Developed Area)
+      #   CBD      → Area B (Moderately Developed Area)
+      #   HDZ      → Area C (Sparsely Developed Area)
+      # FAR, setback, and coverage values are derived from Byelaw Tables 4–6, 10, 13.
       prompts = [
         'City',
-        'Classification (Heritage / CBD / HDZ)',
+        'Classification (Heritage=IntenseDev / CBD=ModerateDev / HDZ=SparseDev)',
         'Zone (Residential / Commercial / Industry)',
         'Overlays (comma-separated, blank for none)',
-        'Parking slots provided'
+        'Parking slots provided',
+        'Has lift? (yes / no)'
       ]
-      defaults = ['Bangalore', 'CBD', 'Residential', '', '0']
-      input = ::UI.inputbox(prompts, defaults, 'Planara — Project setup')
+      defaults = ['Bangalore', 'CBD', 'Residential', '', '0', 'no']
+      input = ::UI.inputbox(prompts, defaults, 'Planara — Project setup (Byelaws 2003)')
       return nil unless input
 
       overlays = input[3].to_s.split(',').map(&:strip).reject(&:empty?)
+      has_lift = input[5].to_s.strip.downcase.start_with?('y')
       {
         city: input[0],
         classification: input[1],
         zone: input[2],
         overlays: overlays,
         parking_slots: input[4].to_i,
+        has_lift: has_lift,
       }
     end
 

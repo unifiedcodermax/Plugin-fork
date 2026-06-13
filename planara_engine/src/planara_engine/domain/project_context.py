@@ -23,6 +23,15 @@ class ProjectContext(BaseModel):
 
     classification: typically CBD / Heritage / HDZ for Bangalore.
                     Other cities will use other tags.
+
+                    Bangalore mapping to Building Byelaws 2003:
+                      Heritage → Area A (Intensely Developed)
+                      CBD      → Area B (Moderately Developed)
+                      HDZ      → Area C (Sparsely Developed)
+                    The byelaws define FAR, coverage, and setbacks
+                    based on these area classifications combined with
+                    plot area and abutting road width (Tables 4–6).
+
     zone:           Residential / Commercial / Industrial / etc.
     city:           Rule-pack key. Determines which pack to load.
     overlays:       Additional restriction layers in effect on
