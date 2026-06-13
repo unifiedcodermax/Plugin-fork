@@ -53,12 +53,12 @@ def evaluate(snapshot: Snapshot, rule: Rule) -> EvaluationResult:
             worst_level = floor.level
 
     if not per_floor:
-        computed = {
+        empty_computed = {
             "min_height_m": min_height_m,
             "per_floor": per_floor,
             "note": "no habitable above-grade floors found",
         }
-        return EvaluationResult(passed=True, computed=computed)
+        return EvaluationResult(passed=True, computed=empty_computed)
 
     computed: dict[str, Any] = {
         "min_height_m": min_height_m,
