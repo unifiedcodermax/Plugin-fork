@@ -124,10 +124,11 @@ def test_baseline_passes_every_rule(
     body = resp.json()
     assert body["ok"] is True, body["violations"]
     assert body["violations"] == []
-    assert body["metrics"]["rule_pack_version"] == "0.3.0"
-    # No overlays in the baseline snapshot → only the 5 base categories
-    # fire (overlay height rules are skipped).
-    assert body["metrics"]["rule_count"] == 5  # fsi + setback + coverage + open_space + parking
+    assert body["metrics"]["rule_pack_version"] == "0.4.0"
+    # No overlays in the baseline snapshot → only the base rules fire.
+    # Base rules in 0.4.0: 1 FSI, 2 Setback, 1 Coverage, 1 Open space, 1 Parking,
+    # 1 Room height, 1 Lift, 3 Info rules = 11 total.
+    assert body["metrics"]["rule_count"] == 11
 
 
 # ---- FSI ---------------------------------------------------------------------
@@ -167,18 +168,19 @@ def test_fsi_warning_near_limit(
     app_client: TestClient, authed_headers: dict[str, str]
 ) -> None:
     snap = _baseline()
-    # 5 floors of 35x35 = 6125 / 2500 = 2.45. In CBD/Res warn band [2.25, 2.5].
+    # CBD/Residential FSI limit is 1.75. Warning band is [1.575, 1.75].
+    # 4 floors of 32x32 = 4096 / 2500 = 1.6384.
     snap["building"]["floors"] = [
         {
             "level": i,
-            "polygon": {"exterior": _square(35.0, 7.5, 7.5)},
+            "polygon": {"exterior": _square(32.0, 9.0, 9.0)},
             "height_m": 3.0,
             "is_habitable": True,
         }
-        for i in range(5)
+        for i in range(4)
     ]
-    # Parking: 6125/100 = 62 primary, ceil(62 * 0.1) = 7 visitor = 69.
-    snap["building"]["parking_slots_provided"] = 69
+    # Parking: 4096/100 = 41 primary, ceil(41 * 0.1) = 5 visitor = 46.
+    snap["building"]["parking_slots_provided"] = 46
 
     resp = app_client.post("/validate", json=snap, headers=authed_headers)
     body = resp.json()
@@ -196,15 +198,15 @@ def test_setback_violation(
     app_client: TestClient, authed_headers: dict[str, str]
 ) -> None:
     snap = _baseline()
-    # Slide to (1, 20) -> 1m clearance on west. CBD/Res requires 2m.
-    snap["building"]["floors"][0]["polygon"]["exterior"] = _square(10.0, 1.0, 20.0)
+    # Slide to (0.5, 20) -> 0.5m clearance on west. CBD/Res requires 1.0m.
+    snap["building"]["floors"][0]["polygon"]["exterior"] = _square(10.0, 0.5, 20.0)
     resp = app_client.post("/validate", json=snap, headers=authed_headers)
     body = resp.json()
     by_cat = _violations_by_category(body)
     assert "setback" in by_cat, body
     v = by_cat["setback"][0]
     assert v["rule_id"] == "blr.setback.cbd.residential"
-    assert v["computed"]["min_distance_m"] == 1.0
+    assert v["computed"]["min_distance_m"] == 0.5
     assert v["computed"]["violating_level"] == 0
 
 
@@ -215,17 +217,17 @@ def test_coverage_violation(
     app_client: TestClient, authed_headers: dict[str, str]
 ) -> None:
     snap = _baseline()
-    # 40x40 = 1600 / 2500 = 64% (> 60% cap). Centered at (5,5) -> 5m clearance.
-    snap["building"]["floors"][0]["polygon"]["exterior"] = _square(40.0, 5.0, 5.0)
-    # Parking: 1600/100 + 10% visitor = 16 + 2 = 18.
-    snap["building"]["parking_slots_provided"] = 18
+    # 42x42 = 1764 / 2500 = 70.56% (> 65% cap for CBD/Residential).
+    snap["building"]["floors"][0]["polygon"]["exterior"] = _square(42.0, 4.0, 4.0)
+    # Parking: 1764/100 + 10% visitor = 18 + 2 = 20.
+    snap["building"]["parking_slots_provided"] = 20
 
     resp = app_client.post("/validate", json=snap, headers=authed_headers)
     body = resp.json()
     by_cat = _violations_by_category(body)
     assert "coverage" in by_cat, body
     assert by_cat["coverage"][0]["rule_id"] == "blr.coverage.residential"
-    assert by_cat["coverage"][0]["computed"]["coverage_pct"] == 64.0
+    assert by_cat["coverage"][0]["computed"]["coverage_pct"] == 70.56
 
 
 # ---- Open space --------------------------------------------------------------
@@ -235,12 +237,11 @@ def test_open_space_violation(
     app_client: TestClient, authed_headers: dict[str, str]
 ) -> None:
     snap = _baseline()
-    # 45x45 = 2025 / 2500 = 81% (over 60% cap, fails coverage too).
-    # Open space = 19% < 25% min.
-    # Centered at (2.5, 2.5) -> 2.5m clearance > 2m cap, ok.
-    snap["building"]["floors"][0]["polygon"]["exterior"] = _square(45.0, 2.5, 2.5)
-    # Parking: 2025/100 + 10% visitor = 21 + 3 = 24.
-    snap["building"]["parking_slots_provided"] = 24
+    # 47x47 = 2209 / 2500 = 88.36% (over 65% cap, fails coverage too).
+    # Open space = 11.64% < 15% min.
+    snap["building"]["floors"][0]["polygon"]["exterior"] = _square(47.0, 1.5, 1.5)
+    # Parking: 2209/100 + 10% visitor = 23 + 3 = 26.
+    snap["building"]["parking_slots_provided"] = 26
 
     resp = app_client.post("/validate", json=snap, headers=authed_headers)
     body = resp.json()
@@ -249,7 +250,7 @@ def test_open_space_violation(
     assert "coverage" in by_cat  # both fail by construction
     v = by_cat["open_space"][0]
     assert v["rule_id"] == "blr.open_space.residential"
-    assert v["computed"]["open_space_pct"] == 19.0
+    assert v["computed"]["open_space_pct"] == 11.64
 
 
 # ---- Parking -----------------------------------------------------------------
@@ -341,7 +342,7 @@ def test_no_overlay_skips_height_rules_even_for_tall_building(
     body = resp.json()
     by_cat = _violations_by_category(body)
     assert "height" not in by_cat, body
-    assert body["metrics"]["rule_count"] == 5
+    assert body["metrics"]["rule_count"] == 11
 
 
 def test_airport_overlay_triggers_height_violation(
@@ -379,7 +380,7 @@ def test_airport_overlay_compliant_height_passes(
     body = resp.json()
     by_cat = _violations_by_category(body)
     assert "height" not in by_cat, body
-    assert body["metrics"]["rule_count"] == 6
+    assert body["metrics"]["rule_count"] == 12
     assert body["metrics"]["height_m"] == 30.0
 
 
@@ -435,4 +436,4 @@ def test_unknown_overlay_silently_fires_nothing(
     resp = app_client.post("/validate", json=snap, headers=authed_headers)
     body = resp.json()
     assert "height" not in _violations_by_category(body)
-    assert body["metrics"]["rule_count"] == 5
+    assert body["metrics"]["rule_count"] == 11

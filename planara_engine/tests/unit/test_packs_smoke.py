@@ -48,7 +48,9 @@ def _clear_pack_cache() -> Iterator[None]:
         "planara_engine.compliance.coverage",
         "planara_engine.compliance.fsi",
         "planara_engine.compliance.height",
+        "planara_engine.compliance.lift_required",
         "planara_engine.compliance.parking",
+        "planara_engine.compliance.room_height",
         "planara_engine.compliance.setback",
     ):
         importlib.reload(importlib.import_module(mod))

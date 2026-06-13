@@ -345,6 +345,7 @@ def _save_failing(client: TestClient, headers: dict[str, str]) -> str:
         for i in range(8)
     ]
     snap["building"]["parking_slots_provided"] = 200
+    snap["building"]["has_lift"] = True
     resp = client.post("/history", json=snap, headers=headers)
     return resp.json()["report_id"]
 
