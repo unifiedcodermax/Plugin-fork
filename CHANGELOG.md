@@ -3,6 +3,17 @@
 All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
+## [0.3.2] — 2026-06-14
+
+Fixes version syncing issue across pyproject.toml and __init__.py causing releases to generate assets with an outdated version tag.
+
+## [0.3.1] — 2026-06-13
+
+Bug fix release to resolve strict type checking errors in the compliance engine.
+
+### Fixed
+- Fixed mypy `no-redef` error on variable `computed` in `room_height.py`.
+
 
 ## [0.2.5] — 2026-06-12
 
