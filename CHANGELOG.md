@@ -3,6 +3,26 @@
 All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
+## [0.5.0] — 2026-06-16
+
+Feature release introducing green building initiative suggestions for FSI violations.
+
+### Added — engine
+- Added `hint` field to `Violation` model and `hint_template` to `Rule` schema. The engine evaluates these templates when a rule is violated.
+- Configured all non-industrial Bangalore FSI rules to suggest participation in the Green Building Initiative program (solar panels or wet waste composting) when FSI limits are exceeded.
+
+### Added — plugin
+- Conditionally render actionable hints below violation messages in a green block with a lightbulb icon.
+
+## [0.4.0] — 2026-06-16
+
+Feature release introducing real-time, mid-gesture compliance feedback.
+
+### Added — plugin
+- Added `InDesignObserver` to capture mid-gesture entity modifications.
+- Introduced `LimitsCache` to store authoritative rule limits on the Ruby side.
+- Wired up real-time feedback with an amber status banner showing in-design warnings during active modeling.
+
 ## [0.3.2] — 2026-06-14
 
 Fixes version syncing issue across pyproject.toml and __init__.py causing releases to generate assets with an outdated version tag.
