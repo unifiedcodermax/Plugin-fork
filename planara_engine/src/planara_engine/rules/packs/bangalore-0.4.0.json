@@ -10,7 +10,8 @@
       "evaluator": "fsi_limit",
       "params": { "max_fsi": 1.25, "warn_within_pct": 0.1 },
       "severity": "error",
-      "message_template": "FSI {fsi} exceeds the Heritage/Residential limit of {max_fsi} (Byelaw Table 6, Intensely Developed Area). Built-up: {built_up_m2} m² on a {plot_area_m2} m² plot."
+      "message_template": "FSI {fsi} exceeds the Heritage/Residential limit of {max_fsi} (Byelaw Table 6, Intensely Developed Area). Built-up: {built_up_m2} m² on a {plot_area_m2} m² plot.",
+      "hint_template": "Since you have crossed the FSI limit, you can get additional FSI if you participate in the Green Building Initiative program by having solar panels for energy generation or having onsite wet waste composting measures."
     },
     {
       "id": "blr.fsi.heritage.commercial",
@@ -19,7 +20,8 @@
       "evaluator": "fsi_limit",
       "params": { "max_fsi": 1.50, "warn_within_pct": 0.1 },
       "severity": "error",
-      "message_template": "FSI {fsi} exceeds the Heritage/Commercial limit of {max_fsi} (Byelaw Table 6, Intensely Developed Area)."
+      "message_template": "FSI {fsi} exceeds the Heritage/Commercial limit of {max_fsi} (Byelaw Table 6, Intensely Developed Area).",
+      "hint_template": "Since you have crossed the FSI limit, you can get additional FSI if you participate in the Green Building Initiative program by having solar panels for energy generation or having onsite wet waste composting measures."
     },
     {
       "id": "blr.fsi.heritage.industry",
@@ -37,7 +39,8 @@
       "evaluator": "fsi_limit",
       "params": { "max_fsi": 1.75, "warn_within_pct": 0.1 },
       "severity": "error",
-      "message_template": "FSI {fsi} exceeds the CBD/Residential limit of {max_fsi} (Byelaw Table 6, Moderately Developed Area)."
+      "message_template": "FSI {fsi} exceeds the CBD/Residential limit of {max_fsi} (Byelaw Table 6, Moderately Developed Area).",
+      "hint_template": "Since you have crossed the FSI limit, you can get additional FSI if you participate in the Green Building Initiative program by having solar panels for energy generation or having onsite wet waste composting measures."
     },
     {
       "id": "blr.fsi.cbd.commercial",
@@ -46,7 +49,8 @@
       "evaluator": "fsi_limit",
       "params": { "max_fsi": 1.75, "warn_within_pct": 0.1 },
       "severity": "error",
-      "message_template": "FSI {fsi} exceeds the CBD/Commercial limit of {max_fsi} (Byelaw Table 6, Moderately Developed Area)."
+      "message_template": "FSI {fsi} exceeds the CBD/Commercial limit of {max_fsi} (Byelaw Table 6, Moderately Developed Area).",
+      "hint_template": "Since you have crossed the FSI limit, you can get additional FSI if you participate in the Green Building Initiative program by having solar panels for energy generation or having onsite wet waste composting measures."
     },
     {
       "id": "blr.fsi.cbd.industry",
@@ -64,7 +68,8 @@
       "evaluator": "fsi_limit",
       "params": { "max_fsi": 2.00, "warn_within_pct": 0.1 },
       "severity": "error",
-      "message_template": "FSI {fsi} exceeds the HDZ/Residential limit of {max_fsi} (Byelaw Table 6, Sparsely Developed Area)."
+      "message_template": "FSI {fsi} exceeds the HDZ/Residential limit of {max_fsi} (Byelaw Table 6, Sparsely Developed Area).",
+      "hint_template": "Since you have crossed the FSI limit, you can get additional FSI if you participate in the Green Building Initiative program by having solar panels for energy generation or having onsite wet waste composting measures."
     },
     {
       "id": "blr.fsi.hdz.commercial",
@@ -73,7 +78,8 @@
       "evaluator": "fsi_limit",
       "params": { "max_fsi": 2.00, "warn_within_pct": 0.1 },
       "severity": "error",
-      "message_template": "FSI {fsi} exceeds the HDZ/Commercial limit of {max_fsi} (Byelaw Table 6, Sparsely Developed Area)."
+      "message_template": "FSI {fsi} exceeds the HDZ/Commercial limit of {max_fsi} (Byelaw Table 6, Sparsely Developed Area).",
+      "hint_template": "Since you have crossed the FSI limit, you can get additional FSI if you participate in the Green Building Initiative program by having solar panels for energy generation or having onsite wet waste composting measures."
     },
     {
       "id": "blr.fsi.hdz.industry",
