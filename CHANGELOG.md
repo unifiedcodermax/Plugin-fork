@@ -3,6 +3,17 @@
 All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
+## [0.6.1] — 2026-06-16
+
+Feature release improving real-time live check behavior and adding FSI warnings.
+
+### Added — plugin
+- Added live, mid-gesture FSI approximation check to the `InDesignObserver`. Architects are now warned instantly if their Push/Pull action causes the building to exceed the maximum FSI.
+
+### Fixed — plugin
+- **Multiple outputs**: Grouped individual `room_height` warnings into a single, concise summary line in the live warning banner.
+- **Vanishing banner**: Fixed a bug where `check_building_height` would short-circuit when height stopped changing, causing the amber warning banner to clear prematurely when pausing mid-gesture.
+
 ## [0.6.0] — 2026-06-16
 
 Feature release introducing green building initiative suggestions for FSI violations.
