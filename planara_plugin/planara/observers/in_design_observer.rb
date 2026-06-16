@@ -127,11 +127,6 @@ module Planara
         return unless max_h && max_h > 0 && max_h < 999 # skip info-only rules with 999m
 
         height = Geometry::QuickChecks.total_building_height(model)
-
-        # Short-circuit if height hasn't changed
-        if @last_height && (height - @last_height).abs < 0.001
-          return
-        end
         @last_height = height
 
         if height > max_h
@@ -155,21 +150,45 @@ module Planara
 
         floor_heights = Geometry::QuickChecks.floor_heights(model)
         new_floor_warnings = {}
+        
+        violating_floors = []
+        worst_level = nil
+        worst_height = nil
 
         floor_heights.each do |level, height_m|
           next if level < 0 # skip basements
 
           if height_m < min_h - 0.005 # same tolerance as engine
             new_floor_warnings[level] = height_m
-            warnings << {
-              type: 'room_height',
-              message: "Floor #{level} height #{height_m.round(2)}m below minimum #{min_h.round(2)}m",
-              detail: "Floor #{level}: #{height_m.round(2)}m | Minimum required: #{min_h.round(2)}m",
-              source: limit_info[:label] || 'Room Height Minimum',
-              current: height_m.round(2),
-              limit: min_h
-            }
+            violating_floors << level
+            if worst_height.nil? || height_m < worst_height
+              worst_height = height_m
+              worst_level = level
+            end
           end
+        end
+
+        if violating_floors.any?
+          count = violating_floors.size
+          message = if count == 1
+                      "Floor #{worst_level} height #{worst_height.round(2)}m below minimum #{min_h.round(2)}m"
+                    else
+                      "#{count} floors below minimum #{min_h.round(2)}m (Worst: Floor #{worst_level} at #{worst_height.round(2)}m)"
+                    end
+          detail = if count == 1
+                     "Floor #{worst_level}: #{worst_height.round(2)}m | Minimum required: #{min_h.round(2)}m"
+                   else
+                     "#{count} non-compliant floors. Worst is Floor #{worst_level} at #{worst_height.round(2)}m"
+                   end
+
+          warnings << {
+            type: 'room_height',
+            message: message,
+            detail: detail,
+            source: limit_info[:label] || 'Room Height Minimum',
+            current: worst_height.round(2),
+            limit: min_h
+          }
         end
 
         @last_floor_warnings = new_floor_warnings
