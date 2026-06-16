@@ -3,7 +3,7 @@
 All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
-## [0.5.0] — 2026-06-16
+## [0.6.0] — 2026-06-16
 
 Feature release introducing green building initiative suggestions for FSI violations.
 
