@@ -68,15 +68,16 @@ module Planara
 
         floor_payloads = floors.map { |level, entity| floor_payload(level, entity) }.compact
 
-        # Thread lift provision from the project setup dialog
         has_lift = (project || {})[:has_lift] || (project || {})['has_lift'] || false
+        declared_floors = (project || {})[:declared_floors] || (project || {})['declared_floors']
 
         build_payload(
           plot_polygon: plot_polygon,
           floor_payloads: floor_payloads,
           project: project,
           parking_slots: parking_slots,
-          has_lift: has_lift
+          has_lift: has_lift,
+          declared_floors: declared_floors
         )
       end
 
@@ -84,7 +85,7 @@ module Planara
       # `extract` so it can be exercised by `test/test_extractor.rb`
       # outside the SketchUp host. The shape pinned here IS the
       # Ruby↔Python wire contract.
-      def build_payload(plot_polygon:, floor_payloads:, project:, parking_slots: 0, has_lift: false)
+      def build_payload(plot_polygon:, floor_payloads:, project:, parking_slots: 0, has_lift: false, declared_floors: nil)
         {
           schema_version: SCHEMA_VERSION,
           snapshot_id: SecureRandom.uuid,
@@ -97,7 +98,7 @@ module Planara
             floors: floor_payloads,
             parking_slots_provided: parking_slots.to_i,
             has_lift: has_lift,
-          },
+          }.tap { |b| b[:declared_floors] = declared_floors if declared_floors },
         }
       end
 

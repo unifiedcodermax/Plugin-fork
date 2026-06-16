@@ -341,14 +341,17 @@ module Planara
         'Zone (Residential / Commercial / Industry)',
         'Overlays (comma-separated, blank for none)',
         'Parking slots provided',
-        'Has lift? (yes / no)'
+        'Has lift? (yes / no)',
+        'Number of floors (leave blank to auto-detect)'
       ]
-      defaults = ['Bangalore', 'CBD', 'Residential', '', '0', 'no']
+      defaults = ['Bangalore', 'CBD', 'Residential', '', '0', 'no', '']
       input = ::UI.inputbox(prompts, defaults, 'Planara — Project setup (Byelaws 2003)')
       return nil unless input
 
       overlays = input[3].to_s.split(',').map(&:strip).reject(&:empty?)
       has_lift = input[5].to_s.strip.downcase.start_with?('y')
+      floors_input = input[6].to_s.strip
+      declared_floors = floors_input.empty? ? nil : floors_input.to_i
       {
         city: input[0],
         classification: input[1],
@@ -356,6 +359,7 @@ module Planara
         overlays: overlays,
         parking_slots: input[4].to_i,
         has_lift: has_lift,
+        declared_floors: declared_floors,
       }
     end
 
