@@ -77,6 +77,19 @@
     }
     .pill.error { background: var(--error-bg); color: var(--error-fg); }
     .pill.warning { background: var(--warning-bg); color: var(--warning-fg); }
+    .hint-block {
+      margin-top: 6px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      background: #eef6ee;
+      border-left: 3px solid #4caf50;
+      color: #2e5e2e;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .hint-block .hint-icon {
+      margin-right: 4px;
+    }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
     .error-banner {
       display: none;
@@ -211,12 +224,16 @@
       violations.forEach(function (v) {
         var tr = document.createElement('tr');
         tr.className = v.severity || '';
+        var hintHtml = '';
+        if (v.hint) {
+          hintHtml = '<div class="hint-block"><span class="hint-icon">💡</span>' + escapeHtml(v.hint) + '</div>';
+        }
         tr.innerHTML =
           '<td class="severity"><span class="pill ' + (v.severity || '') + '">' +
             (v.severity || '') +
           '</span></td>' +
           '<td><code>' + (v.rule_id || '') + '</code></td>' +
-          '<td>' + escapeHtml(v.message || '') + '</td>';
+          '<td>' + escapeHtml(v.message || '') + hintHtml + '</td>';
         body.appendChild(tr);
       });
       table.style.display = '';
