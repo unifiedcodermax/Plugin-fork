@@ -62,6 +62,7 @@ class Building(BaseModel):
 
     floors: list[Floor] = Field(min_length=1)
     total_height_m: float | None = Field(default=None, gt=0.0)
+    declared_floors: int | None = Field(default=None, ge=1)
     parking_slots_provided: int = Field(default=0, ge=0)
     has_lift: bool = Field(
         default=False,

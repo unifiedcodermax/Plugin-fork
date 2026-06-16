@@ -50,6 +50,8 @@ def evaluate(snapshot: Snapshot, rule: Rule) -> EvaluationResult:
 
     above_grade = [f for f in snapshot.building.floors if f.level >= 0]
     above_grade_count = len(above_grade)
+    if snapshot.building.declared_floors is not None:
+        above_grade_count = snapshot.building.declared_floors
 
     declared = snapshot.building.total_height_m
     computed_height = sum(f.height_m for f in above_grade)
