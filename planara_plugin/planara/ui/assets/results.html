@@ -177,6 +177,7 @@
     </thead>
     <tbody id="violations-body"></tbody>
   </table>
+  <div id="hints-container" style="display:none; margin-top:16px;"></div>
 
   <script>
     window.Planara = window.Planara || {};
@@ -218,25 +219,44 @@
 
       if (!violations.length) {
         table.style.display = 'none';
+        document.getElementById('hints-container').style.display = 'none';
         return;
       }
+
+      var allHints = [];
 
       violations.forEach(function (v) {
         var tr = document.createElement('tr');
         tr.className = v.severity || '';
-        var hintHtml = '';
+        
         if (v.hint) {
-          hintHtml = '<div class="hint-block"><span class="hint-icon">💡</span>' + escapeHtml(v.hint) + '</div>';
+          allHints.push(v.hint);
         }
+        
         tr.innerHTML =
           '<td class="severity"><span class="pill ' + (v.severity || '') + '">' +
             (v.severity || '') +
           '</span></td>' +
           '<td><code>' + (v.rule_id || '') + '</code></td>' +
-          '<td>' + escapeHtml(v.message || '') + hintHtml + '</td>';
+          '<td>' + escapeHtml(v.message || '') + '</td>';
         body.appendChild(tr);
       });
       table.style.display = '';
+
+      var hintsContainer = document.getElementById('hints-container');
+      if (allHints.length > 0) {
+        var uniqueHints = allHints.filter(function(item, pos) {
+            return allHints.indexOf(item) == pos;
+        });
+        var hintsHtml = uniqueHints.map(function(hint) {
+          return '<div class="hint-block"><span class="hint-icon">💡</span>' + escapeHtml(hint) + '</div>';
+        }).join('');
+        hintsContainer.innerHTML = hintsHtml;
+        hintsContainer.style.display = '';
+      } else {
+        hintsContainer.style.display = 'none';
+        hintsContainer.innerHTML = '';
+      }
     };
 
     // Show a persistent error banner at the top of the panel.
