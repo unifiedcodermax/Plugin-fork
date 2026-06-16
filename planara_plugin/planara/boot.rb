@@ -18,7 +18,10 @@ require_relative 'session'
 require_relative 'engine_client'
 require_relative 'engine_supervisor'
 require_relative 'geometry/extractor'
+require_relative 'limits_cache'
 require_relative 'observers/live_validator'
+require_relative 'observers/in_design_observer'
+require_relative 'geometry/quick_checks'
 require_relative 'ui/browser_view'
 require_relative 'ui/history_dialog'
 require_relative 'ui/login_dialog'
@@ -227,18 +230,33 @@ module Planara
       model = Sketchup.active_model
       return unless model
 
+      # Tier 1: post-gesture full engine validation (unchanged).
       @live_observer = Observers::LiveValidator.new do
         next unless Session.authenticated? && Session.project_ready?
         live_validate(noisy: false)
       end
       model.add_observer(@live_observer)
-      Logger.info('live_loop_started')
+
+      # Tier 2: mid-gesture Ruby-side quick checks against cached limits.
+      @in_design_observer = Observers::InDesignObserver.new
+      model.entities.add_observer(@in_design_observer)
+
+      Logger.info('live_loop_started', tiers: 2)
     end
 
     def stop_live_loop
-      return unless @live_observer
-      @live_observer.detach(Sketchup.active_model)
-      @live_observer = nil
+      model = Sketchup.active_model
+
+      if @in_design_observer
+        @in_design_observer.detach(model)
+        @in_design_observer = nil
+      end
+
+      if @live_observer
+        @live_observer.detach(model)
+        @live_observer = nil
+      end
+
       Logger.info('live_loop_stopped')
     end
 
@@ -343,6 +361,14 @@ module Planara
 
     def show_validation_result(response)
       UI::ResultsDialog.update(response)
+
+      # Populate limits cache from engine metrics so the in-design
+      # observer has authoritative limits to check against during
+      # the next tool gesture. Also clear any mid-gesture warnings
+      # since the full engine result supersedes them.
+      LimitsCache.populate(response)
+      UI::ResultsDialog.clear_in_design_warning
+      ::Sketchup.set_status_text('', SB_PROMPT) rescue nil
     end
 
     # Called when SketchUp shuts down. Registered in install_hooks
@@ -354,6 +380,7 @@ module Planara
       UI::HistoryDialog.close
       EngineSupervisor.stop
       Session.clear
+      LimitsCache.clear
     end
 
     # Called when the user closes the Live compliance dialog via the
@@ -365,6 +392,7 @@ module Planara
       Logger.info('results_dialog_closed_by_user')
       stop_live_loop
       Session.project = nil
+      LimitsCache.clear
       UI::ResultsDialog.reset_dialog_ref
     end
 
