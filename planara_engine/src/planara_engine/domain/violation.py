@@ -40,6 +40,10 @@ class Violation(BaseModel):
     category: str = Field(min_length=1, max_length=32)
     severity: Severity
     message: str
+    hint: str | None = Field(
+        default=None,
+        description="Optional actionable suggestion shown below the violation message.",
+    )
     computed: dict[str, Any] = Field(default_factory=dict)
 
 

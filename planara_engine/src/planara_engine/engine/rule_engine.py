@@ -61,6 +61,7 @@ def evaluate(snapshot: Snapshot) -> ValidationResponse:
                 category=rule.category,
                 severity=severity,
                 message=_render_message(rule, result.computed),
+                hint=_render_hint(rule, result.computed),
                 computed=result.computed,
             )
         )
@@ -96,6 +97,19 @@ def _render_message(rule: Rule, computed: dict[str, Any]) -> str:
         # Bad format spec inside the template itself — still
         # return SOMETHING the plugin can show.
         return f"violation: {rule.id}"
+
+
+def _render_hint(rule: Rule, computed: dict[str, Any]) -> str | None:
+    """Render the rule's hint_template, or return None if unset."""
+
+    if not rule.hint_template:
+        return None
+
+    context = _SafeDict({**rule.params, **computed})
+    try:
+        return rule.hint_template.format_map(context)
+    except (ValueError, IndexError):
+        return None
 
 
 class _SafeDict(dict[str, Any]):

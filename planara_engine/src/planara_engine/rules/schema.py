@@ -65,6 +65,12 @@ class Rule(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
     severity: Severity = Severity.error
     message_template: str = Field(default="", max_length=512)
+    hint_template: str = Field(
+        default="",
+        max_length=512,
+        description="Optional hint template rendered when the rule fires. "
+        "Supports the same {placeholders} as message_template.",
+    )
 
 
 class RulePack(BaseModel):
