@@ -108,6 +108,37 @@ module Planara
       rescue StandardError => e
         Planara::Logger.warn('results_push_error_failed', error: e.message)
       end
+
+      # Push in-design (mid-gesture) warnings into the dialog's
+      # amber banner. Called by InDesignObserver during active tool
+      # interactions (Push/Pull, Move, Scale).
+      #
+      # @param warnings [Array<Hash>] each with :type, :message,
+      #   :detail, :source, :current, :limit
+      def push_in_design_warning(warnings)
+        return unless @dialog
+        js = "Planara.onInDesignWarning(#{JSON.generate(warnings)});"
+        @dialog.execute_script(js)
+      rescue StandardError => e
+        Planara::Logger.warn('results_push_in_design_failed', error: e.message)
+      end
+
+      # -- public in-design interface ------------------------------------------
+
+      # Push in-design warnings to the dialog (if visible).
+      def update_in_design_warning(warnings)
+        ensure_dialog
+        push_in_design_warning(warnings) if @dialog.visible?
+      end
+
+      # Clear any in-design warnings from the dialog.
+      def clear_in_design_warning
+        return unless @dialog
+        js = 'Planara.clearInDesignWarning();'
+        @dialog.execute_script(js)
+      rescue StandardError => e
+        Planara::Logger.warn('results_clear_in_design_failed', error: e.message)
+      end
     end
   end
 end

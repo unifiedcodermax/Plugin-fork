@@ -99,9 +99,57 @@
       font-size: 11px;
       color: var(--muted);
     }
+    /* In-design live warning banner — amber/yellow, distinct from
+       the red error banner and green ok state. */
+    .in-design-banner {
+      display: none;
+      padding: 10px 14px;
+      margin: 0 0 12px 0;
+      border-radius: 6px;
+      border: 1px solid #f59e0b;
+      background: #fffbeb;
+      color: #92400e;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .in-design-banner.visible { display: block; }
+    .in-design-banner .live-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .in-design-banner .live-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f59e0b;
+      animation: pulse-dot 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .in-design-banner .live-item {
+      padding: 4px 0;
+    }
+    .in-design-banner .live-values {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      color: #78350f;
+    }
+    .in-design-banner .live-source {
+      font-size: 10px;
+      color: #b45309;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
+  <div id="in-design-banner" class="in-design-banner"></div>
   <div id="error-banner" class="error-banner"></div>
   <h1>Live compliance</h1>
   <div id="meta" class="meta"></div>
@@ -135,8 +183,9 @@
     }
 
     Planara.onResult = function (payload) {
-      // A successful result clears any error banner.
+      // A successful result clears any error banner and in-design warnings.
       Planara.clearError();
+      Planara.clearInDesignWarning();
 
       var ok = payload.ok;
       var violations = payload.violations || [];
@@ -190,6 +239,36 @@
 
     Planara.clearError = function () {
       var banner = document.getElementById('error-banner');
+      banner.classList.remove('visible');
+      banner.innerHTML = '';
+    };
+
+    // Show in-design live warnings during active tool gestures.
+    // warnings: [{ type, message, detail, source, current, limit }, ...]
+    Planara.onInDesignWarning = function (warnings) {
+      var banner = document.getElementById('in-design-banner');
+      if (!warnings || !warnings.length) {
+        Planara.clearInDesignWarning();
+        return;
+      }
+
+      var html = '<div class="live-header">' +
+        '<span class="live-dot"></span> Live Check' +
+        '</div>';
+
+      warnings.forEach(function (w) {
+        html += '<div class="live-item">' +
+          '<div class="live-values">' + escapeHtml(w.detail || w.message) + '</div>' +
+          '<div class="live-source">Source: ' + escapeHtml(w.source || '') + '</div>' +
+          '</div>';
+      });
+
+      banner.innerHTML = html;
+      banner.classList.add('visible');
+    };
+
+    Planara.clearInDesignWarning = function () {
+      var banner = document.getElementById('in-design-banner');
       banner.classList.remove('visible');
       banner.innerHTML = '';
     };
