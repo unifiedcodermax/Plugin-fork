@@ -104,6 +104,9 @@ module Planara
         # -- Per-floor room height check --
         check_room_heights(model, warnings)
 
+        # -- FSI check --
+        check_fsi(model, warnings)
+
         # Push to UI
         if warnings.any?
           Planara::UI::ResultsDialog.update_in_design_warning(warnings)
@@ -192,6 +195,28 @@ module Planara
         end
 
         @last_floor_warnings = new_floor_warnings
+      end
+
+      def check_fsi(model, warnings)
+        limit_info = LimitsCache.max_fsi
+        return unless limit_info
+
+        max_fsi = limit_info[:value]
+        return unless max_fsi && max_fsi > 0
+
+        fsi = Geometry::QuickChecks.approximate_fsi(model)
+        return unless fsi
+
+        if fsi > max_fsi
+          warnings << {
+            type: 'fsi',
+            message: "FSI #{fsi} exceeds limit #{max_fsi}",
+            detail: "Approximate FSI: #{fsi} | Maximum allowed: #{max_fsi}",
+            source: limit_info[:label] || 'FSI Limit',
+            current: fsi,
+            limit: max_fsi
+          }
+        end
       end
     end
   end
