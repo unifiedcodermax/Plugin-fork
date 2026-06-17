@@ -27,7 +27,9 @@ module Planara
       def total_building_height(model)
         return 0.0 unless model
 
-        total = 0.0
+        min_bottom_m = nil
+        max_top_m = nil
+
         model.entities.each do |e|
           next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
           name = entity_name(e)
@@ -38,11 +40,18 @@ module Planara
           next if level < 0 # exclude basements
 
           bb = e.bounds
-          height_in = bb.max.z - bb.min.z
-          height_m = Units.inches_to_meters(height_in)
-          total += height_m > 0 ? height_m : 0.0
+          height_m = Units.inches_to_meters(bb.max.z - bb.min.z)
+          height_m = 3.0 if height_m <= 0.0 # degenerate fallback
+
+          bottom_m = Units.inches_to_meters(bb.min.z)
+          top_m = bottom_m + height_m
+
+          min_bottom_m = bottom_m if min_bottom_m.nil? || bottom_m < min_bottom_m
+          max_top_m = top_m if max_top_m.nil? || top_m > max_top_m
         end
-        total
+
+        return 0.0 unless min_bottom_m && max_top_m && max_top_m > min_bottom_m
+        (max_top_m - min_bottom_m).round(3)
       end
 
       # Per-floor heights in meters.
@@ -61,9 +70,9 @@ module Planara
 
           level = match[1].to_i
           bb = e.bounds
-          height_in = bb.max.z - bb.min.z
-          height_m = Units.inches_to_meters(height_in)
-          result[level] = (height_m > 0 ? height_m : 0.0).round(3)
+          height_m = Units.inches_to_meters(bb.max.z - bb.min.z)
+          height_m = 3.0 if height_m <= 0.0 # degenerate fallback
+          result[level] = height_m.round(3)
         end
         result
       end
