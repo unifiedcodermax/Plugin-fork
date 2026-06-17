@@ -230,16 +230,17 @@ module Planara
       model = Sketchup.active_model
       return unless model
 
+      # Tier 2: mid-gesture Ruby-side quick checks against cached limits.
+      @in_design_observer = Observers::InDesignObserver.new
+      model.entities.add_observer(@in_design_observer)
+
       # Tier 1: post-gesture full engine validation (unchanged).
-      @live_observer = Observers::LiveValidator.new do
+      @live_observer = Observers::LiveValidator.new(in_design_observer: @in_design_observer) do
         next unless Session.authenticated? && Session.project_ready?
         live_validate(noisy: false)
       end
       model.add_observer(@live_observer)
-
-      # Tier 2: mid-gesture Ruby-side quick checks against cached limits.
-      @in_design_observer = Observers::InDesignObserver.new
-      model.entities.add_observer(@in_design_observer)
+      @live_observer.attach_active_path(model)
 
       Logger.info('live_loop_started', tiers: 2)
     end

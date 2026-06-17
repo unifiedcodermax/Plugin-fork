@@ -17,10 +17,23 @@ module Planara
     class LiveValidator < Sketchup::ModelObserver
       DEBOUNCE_S = 0.5
 
-      def initialize(&on_fire)
+      def initialize(in_design_observer: nil, &on_fire)
         super()
         @on_fire = on_fire
         @timer_id = nil
+        @in_design_observer = in_design_observer
+        @last_active_entities = nil
+      end
+
+      def attach_active_path(model)
+        return unless @in_design_observer
+        @last_active_entities&.remove_observer(@in_design_observer) rescue nil
+        @last_active_entities = model.active_entities
+        @last_active_entities.add_observer(@in_design_observer)
+      end
+
+      def onActivePathChanged(model)
+        attach_active_path(model)
       end
 
       def onTransactionCommit(_model)

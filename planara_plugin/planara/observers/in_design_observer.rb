@@ -67,7 +67,11 @@ module Planara
       # floor/plot containers. Ignore individual edges, faces, etc.
       # to avoid flooding during Push/Pull on sub-geometry.
       def relevant_entity?(entity)
-        entity.is_a?(Sketchup::Group) || entity.is_a?(Sketchup::ComponentInstance)
+        # We must process all entities (including edges/faces) because when
+        # a user edits inside a group using Push/Pull, the modified entities
+        # are edges and faces, not groups. The 100ms debounce protects against
+        # flooding during these rapid events.
+        true
       end
 
       def schedule
