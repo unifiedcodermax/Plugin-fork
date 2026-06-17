@@ -68,6 +68,31 @@ module Planara
 
         floor_payloads = floors.map { |level, entity| floor_payload(level, entity) }.compact
 
+        # Compute total above-grade building height using actual extracted floor heights.
+        # This prevents double-counting overlaps (which sum(height) does) while
+        # still respecting degenerate floor fallbacks (which raw bounds do not).
+        above_grade = floors.select { |level, _| level >= 0 }
+        total_height_m = nil
+        if above_grade.any?
+          min_bottom_m = nil
+          max_top_m = nil
+
+          above_grade.each do |level, entity|
+            payload = floor_payloads.find { |p| p[:level] == level }
+            next unless payload
+
+            bottom_m = Units.inches_to_meters(entity.bounds.min.z)
+            top_m = bottom_m + payload[:height_m]
+
+            min_bottom_m = bottom_m if min_bottom_m.nil? || bottom_m < min_bottom_m
+            max_top_m = top_m if max_top_m.nil? || top_m > max_top_m
+          end
+
+          if min_bottom_m && max_top_m && max_top_m > min_bottom_m
+            total_height_m = (max_top_m - min_bottom_m).round(3)
+          end
+        end
+
         has_lift = (project || {})[:has_lift] || (project || {})['has_lift'] || false
         declared_floors = (project || {})[:declared_floors] || (project || {})['declared_floors']
 
@@ -77,7 +102,8 @@ module Planara
           project: project,
           parking_slots: parking_slots,
           has_lift: has_lift,
-          declared_floors: declared_floors
+          declared_floors: declared_floors,
+          total_height_m: total_height_m
         )
       end
 
@@ -85,7 +111,7 @@ module Planara
       # `extract` so it can be exercised by `test/test_extractor.rb`
       # outside the SketchUp host. The shape pinned here IS the
       # Ruby↔Python wire contract.
-      def build_payload(plot_polygon:, floor_payloads:, project:, parking_slots: 0, has_lift: false, declared_floors: nil)
+      def build_payload(plot_polygon:, floor_payloads:, project:, parking_slots: 0, has_lift: false, declared_floors: nil, total_height_m: nil)
         {
           schema_version: SCHEMA_VERSION,
           snapshot_id: SecureRandom.uuid,
@@ -98,7 +124,10 @@ module Planara
             floors: floor_payloads,
             parking_slots_provided: parking_slots.to_i,
             has_lift: has_lift,
-          }.tap { |b| b[:declared_floors] = declared_floors if declared_floors },
+          }.tap do |b|
+            b[:declared_floors] = declared_floors if declared_floors
+            b[:total_height_m] = total_height_m if total_height_m
+          end,
         }
       end
 
