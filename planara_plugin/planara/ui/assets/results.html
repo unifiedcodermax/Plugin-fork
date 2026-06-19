@@ -112,32 +112,32 @@
       font-size: 11px;
       color: var(--muted);
     }
-    /* In-design live warning banner — amber/yellow, distinct from
-       the red error banner and green ok state. */
     .in-design-banner {
       display: none;
-      padding: 10px 14px;
+      padding: 12px 16px;
       margin: 0 0 12px 0;
-      border-radius: 6px;
-      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      border: 2px solid #f59e0b;
       background: #fffbeb;
       color: #92400e;
-      font-size: 12px;
-      line-height: 1.5;
+      font-size: 13px;
+      line-height: 1.6;
     }
     .in-design-banner.visible { display: block; }
     .in-design-banner .live-header {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-weight: 600;
-      font-size: 13px;
-      margin-bottom: 6px;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #fbbf24;
     }
     .in-design-banner .live-dot {
       display: inline-block;
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: #f59e0b;
       animation: pulse-dot 1.2s ease-in-out infinite;
@@ -147,35 +147,42 @@
       50% { opacity: 0.3; }
     }
     .in-design-banner .live-item {
-      padding: 4px 0;
+      padding: 8px 0;
+      border-bottom: 1px solid #fde68a;
     }
-    .in-design-banner .live-values {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 11px;
-      color: #78350f;
-    }
-    .in-design-banner .live-source {
-      font-size: 10px;
-      color: #b45309;
-      margin-top: 2px;
+    .in-design-banner .live-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
     }
     .in-design-banner .live-message {
-      font-weight: 600;
-      font-size: 12px;
-      color: #92400e;
+      font-weight: 700;
+      font-size: 13px;
+      color: #78350f;
+      margin-bottom: 4px;
     }
     .in-design-banner .live-excess-row {
-      margin: 3px 0;
+      margin: 5px 0;
     }
     .in-design-banner .live-excess {
       display: inline-block;
-      padding: 2px 8px;
+      padding: 3px 10px;
       border-radius: 4px;
       background: #fde68a;
       color: #92400e;
       font-weight: 700;
-      font-size: 12px;
+      font-size: 14px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .in-design-banner .live-values {
+      font-size: 12px;
+      color: #78350f;
+      margin-top: 3px;
+    }
+    .in-design-banner .live-source {
+      font-size: 10px;
+      color: #b45309;
+      margin-top: 3px;
+      font-style: italic;
     }
   </style>
 </head>
@@ -198,77 +205,67 @@
   <div id="hints-container" style="display:none; margin-top:16px;"></div>
 
   <script>
-    window.Planara = window.Planara || {};
+    var Planara = window.Planara || {};
+    window.Planara = Planara;
 
-    function fmtMeta(metrics) {
-      var bits = [];
-      if (metrics && metrics.rule_pack_version) bits.push('Pack ' + metrics.rule_pack_version);
-      if (metrics && typeof metrics.rule_count === 'number') bits.push(metrics.rule_count + ' rules');
-      if (metrics && typeof metrics.fsi === 'number') {
-        var fsiText = 'FSI ' + metrics.fsi;
-        if (typeof metrics.max_fsi === 'number') fsiText += ' / ' + metrics.max_fsi;
-        bits.push(fsiText);
-      }
-      if (metrics && typeof metrics.coverage_pct === 'number') bits.push('Coverage ' + metrics.coverage_pct + '%');
-      if (metrics && typeof metrics.height_m === 'number') bits.push('Height ' + metrics.height_m + ' m');
-      return bits.map(function (b) { return '<span>' + b + '</span>'; }).join('');
-    }
-
+    // Main engine result handler
     Planara.onResult = function (payload) {
-      // A successful result clears any error banner and in-design warnings.
+      // Clear any previous error
       Planara.clearError();
-      Planara.clearInDesignWarning();
 
-      var ok = payload.ok;
-      var violations = payload.violations || [];
       var metrics = payload.metrics || {};
+      var violations = payload.violations || [];
+      var ok = payload.ok;
 
+      // -- meta row --
+      var meta = document.getElementById('meta');
+      var parts = [];
+      if (metrics.rule_pack_version) parts.push('Pack ' + metrics.rule_pack_version);
+      if (metrics.rule_count) parts.push(metrics.rule_count + ' rules');
+      if (typeof metrics.fsi === 'number') parts.push('FSI ' + metrics.fsi + ' / ' + (metrics.max_fsi || '—'));
+      if (typeof metrics.ground_coverage_pct === 'number') parts.push('Coverage ' + metrics.ground_coverage_pct + '%');
+      if (typeof metrics.building_height_m === 'number') parts.push('Height ' + metrics.building_height_m + ' m');
+      meta.textContent = parts.join('   ');
+
+      // -- summary --
       var summary = document.getElementById('summary');
-      summary.className = 'summary ' + (ok ? 'ok' : 'fail');
-      summary.textContent = ok
-        ? 'Design is compliant.'
-        : violations.length + ' violation' + (violations.length === 1 ? '' : 's') + ' — design is not compliant.';
+      summary.classList.remove('empty', 'ok', 'fail');
+      if (ok) {
+        summary.textContent = '✅ Design is compliant.';
+        summary.classList.add('ok');
+      } else {
+        summary.textContent = violations.length + ' violation' + (violations.length === 1 ? '' : 's') + ' — design is not compliant.';
+        summary.classList.add('fail');
+      }
 
-      document.getElementById('meta').innerHTML = fmtMeta(metrics);
-
+      // -- violations table --
       var table = document.getElementById('violations-table');
       var body = document.getElementById('violations-body');
       body.innerHTML = '';
-
-      if (!violations.length) {
+      if (violations.length) {
+        table.style.display = '';
+        violations.forEach(function (v) {
+          var tr = document.createElement('tr');
+          var sev = v.severity || 'warning';
+          tr.innerHTML =
+            '<td><span class="pill ' + sev + '">' + sev.toUpperCase() + '</span></td>' +
+            '<td><code>' + escapeHtml(v.rule_id || '') + '</code></td>' +
+            '<td>' + escapeHtml(v.message || '') + '</td>';
+          body.appendChild(tr);
+        });
+      } else {
         table.style.display = 'none';
-        document.getElementById('hints-container').style.display = 'none';
-        return;
       }
 
-      var allHints = [];
-
-      violations.forEach(function (v) {
-        var tr = document.createElement('tr');
-        tr.className = v.severity || '';
-        
-        if (v.hint) {
-          allHints.push(v.hint);
-        }
-        
-        tr.innerHTML =
-          '<td class="severity"><span class="pill ' + (v.severity || '') + '">' +
-            (v.severity || '') +
-          '</span></td>' +
-          '<td><code>' + (v.rule_id || '') + '</code></td>' +
-          '<td>' + escapeHtml(v.message || '') + '</td>';
-        body.appendChild(tr);
-      });
-      table.style.display = '';
-
+      // -- hints --
       var hintsContainer = document.getElementById('hints-container');
-      if (allHints.length > 0) {
-        var uniqueHints = allHints.filter(function(item, pos) {
-            return allHints.indexOf(item) == pos;
-        });
-        var hintsHtml = uniqueHints.map(function(hint) {
-          return '<div class="hint-block"><span class="hint-icon">💡</span>' + escapeHtml(hint) + '</div>';
-        }).join('');
+      var hintsHtml = '';
+      violations.forEach(function (v) {
+        if (v.hint) {
+          hintsHtml += '<div class="hint-block"><span class="hint-icon">💡</span>' + escapeHtml(v.hint) + '</div>';
+        }
+      });
+      if (hintsHtml) {
         hintsContainer.innerHTML = hintsHtml;
         hintsContainer.style.display = '';
       } else {
@@ -277,8 +274,6 @@
       }
     };
 
-    // Show a persistent error banner at the top of the panel.
-    // payload: { error_type: "extraction" | "engine", message: "..." }
     Planara.onError = function (payload) {
       var banner = document.getElementById('error-banner');
       var msg = escapeHtml(payload.message || 'An error occurred.');
@@ -308,17 +303,20 @@
       }
 
       var html = '<div class="live-header">' +
-        '<span class="live-dot"></span> Live Check — ' +
+        '<span class="live-dot"></span>' +
+        ' ⚠️ Live Check — ' +
         warnings.length + ' violation' + (warnings.length === 1 ? '' : 's') +
+        ' detected' +
         '</div>';
 
       warnings.forEach(function (w) {
         var excessText = '';
         if (typeof w.excess === 'number' && w.excess > 0) {
           var unit = w.unit || '';
+          var verb = (w.type === 'setback' || w.type === 'room_height')
+            ? 'violated by ' : 'exceeded by ';
           excessText = '<span class="live-excess">' +
-            (w.type === 'setback' || w.type === 'room_height' ? 'violated by ' : 'exceeded by ') +
-            w.excess.toFixed(2) + unit +
+            verb + w.excess.toFixed(2) + unit +
             '</span>';
         }
 
@@ -326,7 +324,6 @@
           '<div class="live-message">' + escapeHtml(w.message || '') + '</div>' +
           (excessText ? '<div class="live-excess-row">' + excessText + '</div>' : '') +
           '<div class="live-values">' + escapeHtml(w.detail || '') + '</div>' +
-          '<div class="live-source">Source: ' + escapeHtml(w.source || '') + '</div>' +
           '</div>';
       });
 
