@@ -159,6 +159,24 @@
       color: #b45309;
       margin-top: 2px;
     }
+    .in-design-banner .live-message {
+      font-weight: 600;
+      font-size: 12px;
+      color: #92400e;
+    }
+    .in-design-banner .live-excess-row {
+      margin: 3px 0;
+    }
+    .in-design-banner .live-excess {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #fde68a;
+      color: #92400e;
+      font-weight: 700;
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
   </style>
 </head>
 <body>
@@ -281,7 +299,7 @@
     };
 
     // Show in-design live warnings during active tool gestures.
-    // warnings: [{ type, message, detail, source, current, limit }, ...]
+    // warnings: [{ type, severity, current, limit, excess, unit, source, message, detail }, ...]
     Planara.onInDesignWarning = function (warnings) {
       var banner = document.getElementById('in-design-banner');
       if (!warnings || !warnings.length) {
@@ -290,12 +308,24 @@
       }
 
       var html = '<div class="live-header">' +
-        '<span class="live-dot"></span> Live Check' +
+        '<span class="live-dot"></span> Live Check — ' +
+        warnings.length + ' violation' + (warnings.length === 1 ? '' : 's') +
         '</div>';
 
       warnings.forEach(function (w) {
+        var excessText = '';
+        if (typeof w.excess === 'number' && w.excess > 0) {
+          var unit = w.unit || '';
+          excessText = '<span class="live-excess">' +
+            (w.type === 'setback' || w.type === 'room_height' ? 'violated by ' : 'exceeded by ') +
+            w.excess.toFixed(2) + unit +
+            '</span>';
+        }
+
         html += '<div class="live-item">' +
-          '<div class="live-values">' + escapeHtml(w.detail || w.message) + '</div>' +
+          '<div class="live-message">' + escapeHtml(w.message || '') + '</div>' +
+          (excessText ? '<div class="live-excess-row">' + excessText + '</div>' : '') +
+          '<div class="live-values">' + escapeHtml(w.detail || '') + '</div>' +
           '<div class="live-source">Source: ' + escapeHtml(w.source || '') + '</div>' +
           '</div>';
       });
