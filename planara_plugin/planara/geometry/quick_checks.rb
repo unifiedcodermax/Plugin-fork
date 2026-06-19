@@ -112,6 +112,117 @@ module Planara
         (built_up_sqm / plot_area_sqm).round(2)
       end
 
+      # Approximate setback check using bounding-box edge distances.
+      #
+      # For each above-grade floor, computes the minimum axis-aligned
+      # distance between the floor's bounding box and the plot's
+      # bounding box edges.  This is an approximation:
+      #   - Exact for rectangular plots and rectangular footprints
+      #   - Conservative (under-estimates distance) for irregular shapes
+      #
+      # @param model [Sketchup::Model]
+      # @return [Hash, nil] { min_distance_m:, worst_level:, per_floor: [{level:, distance_m:}] }
+      #   or nil if no plot/floors found
+      def approximate_setback(model)
+        return nil unless model
+
+        plot_entity = nil
+        floor_entities = []
+
+        model.entities.each do |e|
+          next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+          name = entity_name(e)
+
+          if name =~ PLOT_NAME_REGEX
+            plot_entity = e
+          elsif match = FLOOR_NAME_REGEX.match(name)
+            level = match[1].to_i
+            next if level < 0 # skip basements
+            floor_entities << [level, e]
+          end
+        end
+
+        return nil unless plot_entity && floor_entities.any?
+
+        plot_bb = plot_entity.bounds
+        plot_min_x = Units.inches_to_meters(plot_bb.min.x)
+        plot_max_x = Units.inches_to_meters(plot_bb.max.x)
+        plot_min_y = Units.inches_to_meters(plot_bb.min.y)
+        plot_max_y = Units.inches_to_meters(plot_bb.max.y)
+
+        worst_distance = nil
+        worst_level = nil
+        per_floor = []
+
+        floor_entities.each do |level, entity|
+          bb = entity.bounds
+          floor_min_x = Units.inches_to_meters(bb.min.x)
+          floor_max_x = Units.inches_to_meters(bb.max.x)
+          floor_min_y = Units.inches_to_meters(bb.min.y)
+          floor_max_y = Units.inches_to_meters(bb.max.y)
+
+          # Distance from each floor edge to the nearest plot edge
+          dist_left   = floor_min_x - plot_min_x
+          dist_right  = plot_max_x - floor_max_x
+          dist_front  = floor_min_y - plot_min_y
+          dist_back   = plot_max_y - floor_max_y
+
+          min_dist = [dist_left, dist_right, dist_front, dist_back].min
+          per_floor << { level: level, distance_m: min_dist.round(3) }
+
+          if worst_distance.nil? || min_dist < worst_distance
+            worst_distance = min_dist
+            worst_level = level
+          end
+        end
+
+        return nil unless worst_distance
+
+        {
+          min_distance_m: worst_distance.round(3),
+          worst_level: worst_level,
+          per_floor: per_floor
+        }
+      end
+
+      # Approximate ground coverage percentage using bounding boxes.
+      #
+      # Uses the sum of individual ground-floor bounding box areas
+      # (not one combined BB) to avoid overestimation when the design
+      # has multiple detached ground-level structures.
+      #
+      # @param model [Sketchup::Model]
+      # @return [Float, nil] approximate coverage percentage, or nil if no plot
+      def approximate_coverage(model)
+        return nil unless model
+
+        plot_area_sqm = 0.0
+        ground_area_sqm = 0.0
+
+        model.entities.each do |e|
+          next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+          name = entity_name(e)
+
+          if name =~ PLOT_NAME_REGEX
+            bb = e.bounds
+            width_m = Units.inches_to_meters(bb.width)
+            depth_m = Units.inches_to_meters(bb.depth)
+            plot_area_sqm += (width_m * depth_m)
+          elsif match = FLOOR_NAME_REGEX.match(name)
+            level = match[1].to_i
+            next unless level == 0 # only ground floor(s) count
+
+            bb = e.bounds
+            width_m = Units.inches_to_meters(bb.width)
+            depth_m = Units.inches_to_meters(bb.depth)
+            ground_area_sqm += (width_m * depth_m)
+          end
+        end
+
+        return nil if plot_area_sqm <= 0.0
+        ((ground_area_sqm / plot_area_sqm) * 100.0).round(2)
+      end
+
       # -- helpers ---------------------------------------------------------------
 
       def entity_name(entity)
