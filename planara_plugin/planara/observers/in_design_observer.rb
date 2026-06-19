@@ -16,11 +16,8 @@ module Planara
     # response.
     #
     # Performance safeguards:
-    #   1. Only processes Group/ComponentInstance changes (ignores
-    #      individual edges/faces).
-    #   2. 100ms trailing-edge debounce collapses rapid-fire events.
-    #   3. Short-circuits when the computed height hasn't changed.
-    #   4. No HTTP calls — all checks are Ruby-side bounding-box math.
+    #   1. 100ms trailing-edge debounce collapses rapid-fire events.
+    #   2. No HTTP calls — all checks are Ruby-side bounding-box math.
     #
     # Violation payload schema (standardized):
     #   {
@@ -42,24 +39,20 @@ module Planara
         @timer_id = nil
         @last_height = nil
         @last_floor_warnings = {}
+        @last_warnings = []   # cache last warnings for persistence
       end
 
       # Fires during active tool gestures — the geometry has changed
       # but the operation hasn't committed yet.
       def onElementModified(entities, entity)
-        return unless relevant_entity?(entity)
         schedule
       end
 
       def onElementAdded(entities, entity)
-        return unless relevant_entity?(entity)
         schedule
       end
 
       def onElementRemoved(entities, entity_id)
-        # entity_id is an integer (persistent_id) for removed entities.
-        # Can't filter by type here — schedule unconditionally but let
-        # the debounced callback handle the check.
         schedule
       end
 
@@ -72,20 +65,16 @@ module Planara
         cancel_timer
         @last_height = nil
         @last_floor_warnings = {}
+        @last_warnings = []
+      end
+
+      # Allow external code to read the last warnings (e.g. to
+      # re-push them after engine result clears the banner).
+      def last_warnings
+        @last_warnings
       end
 
       private
-
-      # Only process groups and component instances — these are the
-      # floor/plot containers. Ignore individual edges, faces, etc.
-      # to avoid flooding during Push/Pull on sub-geometry.
-      def relevant_entity?(entity)
-        # We must process all entities (including edges/faces) because when
-        # a user edits inside a group using Push/Pull, the modified entities
-        # are edges and faces, not groups. The 100ms debounce protects against
-        # flooding during these rapid events.
-        true
-      end
 
       def schedule
         cancel_timer
@@ -130,6 +119,9 @@ module Planara
         # -- Coverage check --
         check_coverage(model, warnings)
 
+        # Cache warnings so they can be re-pushed after engine clears them
+        @last_warnings = warnings
+
         # Push to UI
         if warnings.any?
           Planara::UI::ResultsDialog.update_in_design_warning(warnings)
@@ -147,10 +139,9 @@ module Planara
 
       # -- Standardized violation builder ------------------------------------
 
-      # Build a standardized warning hash. Every check funnels through
-      # this so the UI can render them uniformly.
+      # Build a standardized warning hash for "exceeds maximum" violations.
       def build_warning(type:, current:, limit:, unit:, source:, detail: nil)
-        excess = (current - limit).abs.round(3)
+        excess = (current - limit).abs.round(2)
         message = "#{humanize_type(type)} exceeds limit by #{excess}#{unit}"
         detail ||= "Current: #{current.round(2)}#{unit} | Limit: #{limit.round(2)}#{unit}"
 
@@ -167,9 +158,9 @@ module Planara
         }
       end
 
-      # Build a warning for "below minimum" violations (room height).
+      # Build a warning for "below minimum" violations (room height, setback).
       def build_below_warning(type:, current:, limit:, unit:, source:, detail: nil)
-        deficit = (limit - current).abs.round(3)
+        deficit = (limit - current).abs.round(2)
         message = "#{humanize_type(type)} below minimum by #{deficit}#{unit}"
         detail ||= "Current: #{current.round(2)}#{unit} | Minimum: #{limit.round(2)}#{unit}"
 
@@ -216,7 +207,7 @@ module Planara
             limit: max_h,
             unit: 'm',
             source: limit_info[:label] || 'Height Limit',
-            detail: "Building height: #{height.round(2)}m | Maximum allowed: #{max_h.round(1)}m | Exceeded by: #{(height - max_h).round(2)}m"
+            detail: "Building: #{height.round(2)}m | Max: #{max_h.round(1)}m"
           )
         end
       end
@@ -230,7 +221,7 @@ module Planara
 
         floor_heights = Geometry::QuickChecks.floor_heights(model)
         new_floor_warnings = {}
-        
+
         violating_floors = []
         worst_level = nil
         worst_height = nil
@@ -240,7 +231,7 @@ module Planara
 
           if height_m < min_h - 0.005 # same tolerance as engine
             new_floor_warnings[level] = height_m
-            violating_floors << level
+            violating_floors << { level: level, height: height_m }
             if worst_height.nil? || height_m < worst_height
               worst_height = height_m
               worst_level = level
@@ -251,9 +242,12 @@ module Planara
         if violating_floors.any?
           count = violating_floors.size
           detail = if count == 1
-                     "Floor #{worst_level}: #{worst_height.round(2)}m | Minimum required: #{min_h.round(2)}m | Below by: #{(min_h - worst_height).round(2)}m"
+                     "Floor #{worst_level}: #{worst_height.round(2)}m | Min required: #{min_h.round(2)}m"
                    else
-                     "#{count} floors below minimum. Worst: Floor #{worst_level} at #{worst_height.round(2)}m (below by #{(min_h - worst_height).round(2)}m)"
+                     # Show max 3 floors to keep it readable
+                     shown = violating_floors.first(3).map { |f| "F#{f[:level]}: #{f[:height].round(2)}m" }.join(', ')
+                     extra = count > 3 ? " (+#{count - 3} more)" : ''
+                     "#{count} floors below min. #{shown}#{extra}"
                    end
 
           warnings << build_below_warning(
@@ -286,7 +280,7 @@ module Planara
             limit: max_fsi,
             unit: '',
             source: limit_info[:label] || 'FSI Limit',
-            detail: "FSI: #{fsi} | Maximum allowed: #{max_fsi} | Exceeded by: #{(fsi - max_fsi).round(2)}"
+            detail: "FSI: #{fsi} | Max: #{max_fsi}"
           )
         end
       end
@@ -305,14 +299,14 @@ module Planara
         worst_level = result[:worst_level]
 
         if min_dist < min_setback - 0.005 # same tolerance as engine
-          deficit = (min_setback - min_dist).round(3)
-          detail = "Floor #{worst_level}: #{min_dist.round(2)}m from boundary | Required: #{min_setback.round(2)}m | Violated by: #{deficit.round(2)}m"
-
-          # Report per-floor violations if multiple floors are affected
-          violating_floors = result[:per_floor].select { |f| f[:distance_m] < min_setback - 0.005 }
-          if violating_floors.size > 1
-            floor_list = violating_floors.map { |f| "Floor #{f[:level]}: #{f[:distance_m]}m" }.join(', ')
-            detail += " | All violations: #{floor_list}"
+          # Only show the worst floor and up to 2 more
+          violating = result[:per_floor].select { |f| f[:distance_m] < min_setback - 0.005 }
+          if violating.size <= 1
+            detail = "Floor #{worst_level}: #{min_dist.round(2)}m from boundary | Required: #{min_setback.round(2)}m"
+          else
+            shown = violating.first(3).map { |f| "F#{f[:level]}: #{f[:distance_m].round(2)}m" }.join(', ')
+            extra = violating.size > 3 ? " (+#{violating.size - 3} more)" : ''
+            detail = "#{shown}#{extra} | Required: #{min_setback.round(2)}m"
           end
 
           warnings << build_below_warning(
@@ -343,7 +337,7 @@ module Planara
             limit: max_coverage,
             unit: '%',
             source: limit_info[:label] || 'Coverage Limit',
-            detail: "Ground coverage: #{coverage.round(1)}% | Maximum allowed: #{max_coverage.round(1)}% | Exceeded by: #{(coverage - max_coverage).round(1)}%"
+            detail: "Coverage: #{coverage.round(1)}% | Max: #{max_coverage.round(1)}%"
           )
         end
       end
