@@ -139,6 +139,20 @@ module Planara
       rescue StandardError => e
         Planara::Logger.warn('results_clear_in_design_failed', error: e.message)
       end
+
+      # Push background violations (from non-active floors) into the
+      # Live Compliance table so they remain visible alongside engine
+      # results. Called by InDesignObserver when the architect is
+      # editing inside a specific floor group.
+      #
+      # @param violations [Array<Hash>] per-floor violation hashes
+      def update_background_violations(violations)
+        return unless @dialog
+        js = "Planara.onBackgroundViolations(#{JSON.generate(violations || [])});"
+        @dialog.execute_script(js)
+      rescue StandardError => e
+        Planara::Logger.warn('results_push_background_failed', error: e.message)
+      end
     end
   end
 end

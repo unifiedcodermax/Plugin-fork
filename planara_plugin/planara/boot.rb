@@ -381,6 +381,13 @@ module Planara
       if @in_design_observer && @in_design_observer.last_warnings.any?
         UI::ResultsDialog.update_in_design_warning(@in_design_observer.last_warnings)
       end
+
+      # Re-push background violations (non-active-floor violations)
+      # into the Live Compliance table after the engine result clears
+      # and redraws it.
+      if @in_design_observer && @in_design_observer.last_background.any?
+        UI::ResultsDialog.update_background_violations(@in_design_observer.last_background)
+      end
     end
 
     # Called when SketchUp shuts down. Registered in install_hooks

@@ -77,6 +77,11 @@
     }
     .pill.error { background: var(--error-bg); color: var(--error-fg); }
     .pill.warning { background: var(--warning-bg); color: var(--warning-fg); }
+    .pill.live {
+      background: #fff7ed;
+      color: #c2410c;
+      border: 1px solid #fb923c;
+    }
     .hint-block {
       margin-top: 6px;
       padding: 6px 10px;
@@ -177,12 +182,38 @@
       font-size: 12px;
       color: #78350f;
       margin-top: 3px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     .in-design-banner .live-source {
       font-size: 10px;
       color: #b45309;
       margin-top: 3px;
       font-style: italic;
+    }
+    /* -- Background violations (other-floor violations in Live Compliance table) -- */
+    .bg-separator td {
+      padding: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #c2410c;
+      background: #fff7ed;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid #fb923c;
+      border-top: 2px solid #fb923c;
+    }
+    tr.bg-violation {
+      background: #fffbf5;
+    }
+    tr.bg-violation:hover {
+      background: #fff7ed;
+    }
+    tr.bg-violation td {
+      border-left: 3px solid #fb923c;
+    }
+    tr.bg-violation td:first-child {
+      padding-left: 5px;
     }
   </style>
 </head>
@@ -201,6 +232,7 @@
       </tr>
     </thead>
     <tbody id="violations-body"></tbody>
+    <tbody id="background-violations-body"></tbody>
   </table>
   <div id="hints-container" style="display:none; margin-top:16px;"></div>
 
@@ -242,6 +274,12 @@
       var table = document.getElementById('violations-table');
       var body = document.getElementById('violations-body');
       body.innerHTML = '';
+
+      // Clear background violations too (they'll be re-pushed by
+      // the observer via boot.rb's show_validation_result)
+      var bgBody = document.getElementById('background-violations-body');
+      bgBody.innerHTML = '';
+
       if (violations.length) {
         table.style.display = '';
         violations.forEach(function (v) {
@@ -335,6 +373,40 @@
       var banner = document.getElementById('in-design-banner');
       banner.classList.remove('visible');
       banner.innerHTML = '';
+    };
+
+    // Show background violations (non-active-floor violations) in the
+    // Live Compliance table. These are floor-specific violations for
+    // floors the architect is NOT currently editing.
+    Planara.onBackgroundViolations = function (violations) {
+      var bgBody = document.getElementById('background-violations-body');
+      bgBody.innerHTML = '';
+
+      if (!violations || !violations.length) return;
+
+      // Make sure the table is visible
+      var table = document.getElementById('violations-table');
+      table.style.display = '';
+
+      // Add separator row
+      var sepTr = document.createElement('tr');
+      sepTr.className = 'bg-separator';
+      sepTr.innerHTML = '<td colspan="3">⚠ Live Check — other floors (' +
+        violations.length + ' violation' + (violations.length === 1 ? '' : 's') + ')</td>';
+      bgBody.appendChild(sepTr);
+
+      // Add each violation as a row
+      violations.forEach(function (v) {
+        var tr = document.createElement('tr');
+        tr.className = 'bg-violation';
+        tr.innerHTML =
+          '<td><span class="pill live">LIVE</span></td>' +
+          '<td><code>' + escapeHtml(v.type || '') + '</code></td>' +
+          '<td>' + escapeHtml(v.message || '') +
+          (v.detail ? '<br><span style="font-size:11px;color:var(--muted)">' + escapeHtml(v.detail) + '</span>' : '') +
+          '</td>';
+        bgBody.appendChild(tr);
+      });
     };
 
     function escapeHtml(s) {
