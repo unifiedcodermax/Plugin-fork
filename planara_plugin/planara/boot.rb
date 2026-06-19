@@ -369,11 +369,18 @@ module Planara
 
       # Populate limits cache from engine metrics so the in-design
       # observer has authoritative limits to check against during
-      # the next tool gesture. Also clear any mid-gesture warnings
-      # since the full engine result supersedes them.
+      # the next tool gesture.
       LimitsCache.populate(response)
-      UI::ResultsDialog.clear_in_design_warning
-      ::Sketchup.set_status_text('', SB_PROMPT) rescue nil
+
+      # Re-push existing in-design warnings so the banner stays
+      # visible after the engine result arrives. Without this, the
+      # banner would vanish ~0.5s after mouse-up because onResult
+      # redraws the page. The in-design observer will naturally
+      # clear the banner on its next evaluation if violations are
+      # resolved.
+      if @in_design_observer && @in_design_observer.last_warnings.any?
+        UI::ResultsDialog.update_in_design_warning(@in_design_observer.last_warnings)
+      end
     end
 
     # Called when SketchUp shuts down. Registered in install_hooks
