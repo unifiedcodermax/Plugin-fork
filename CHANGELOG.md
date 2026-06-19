@@ -4,6 +4,15 @@ All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
 
+## [0.7.2] — 2026-06-19
+
+Feature release improving Live Check context-awareness and violation readability.
+
+### Changed — plugin
+- **Selection-Scoped Live Check:** The amber Live Check banner now only shows violations for the floor the architect is actively editing (via `model.active_path`). All other floor-specific violations are displayed as individually listed rows in the Live Compliance table below, with an orange "LIVE" badge and separator header. Building-wide checks (FSI, height, coverage) always remain in Live Check regardless of editing context.
+- **Full Floor Listing:** Removed the 3-floor truncation (`+22 more`) from room height and setback violation details. All violating floors are now listed individually so architects can see the complete picture.
+- **Background Violations in Live Compliance:** When editing inside a floor group, violations from other floors appear as distinct rows in the Live Compliance table with an "⚠ Live Check — other floors" separator, orange left border, and inline floor details.
+
 ## [0.7.1] — 2026-06-19
 
 Hotfix release addressing critical bugs in live compliance validation.
