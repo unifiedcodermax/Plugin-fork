@@ -4,6 +4,17 @@ All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
 
+## [0.7.1] — 2026-06-19
+
+Hotfix release addressing critical bugs in live compliance validation.
+
+### Fixed — plugin
+- **Phantom Floor Detection:** Only Groups are now treated as floor containers in QuickChecks. ComponentInstances with definition names matching "Floor N" (windows, furniture, copies) were being counted as floors, causing the model to report 61+ phantom floors and absurd setback values (315m).
+- **De-duplicated Floor Levels:** Each floor level is now counted exactly once, preventing duplicates from polluting setback/height/coverage calculations.
+- **Banner Persistence:** The in-design warning banner no longer vanishes after ~0.5s. Previously, the engine response on mouse release would clear the banner immediately. Now warnings persist until the violation is resolved.
+- **Readable UI:** Violation detail text is capped at 3 floors max (was dumping all 74). Larger fonts, separator borders between items, and cleaner layout for architect-friendly readability.
+- **Real-time Updates:** All entity modifications (including edges/faces during Push/Pull inside groups) now trigger live checks through the 100ms debounce.
+
 ## [0.7.0] — 2026-06-19
 
 Feature release adding comprehensive live (in-design) bylaw violation detection with exact measurements.
