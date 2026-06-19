@@ -55,6 +55,26 @@ module Planara
       @max_coverage&.dig(:value)
     end
 
+    # @return [Hash, nil] { value:, source:, label: } or nil when no
+    #   setback limit is active.
+    def min_setback
+      @min_setback
+    end
+
+    # @return [Float, nil] the numeric limit in meters, or nil.
+    def min_setback_m
+      @min_setback&.dig(:value)
+    end
+
+    # @return [Hash, nil]
+    def min_open_space
+      @min_open_space
+    end
+
+    def min_open_space_pct
+      @min_open_space&.dig(:value)
+    end
+
     # -- population from engine response ---------------------------------------
 
     # Populate the cache from a ValidationResponse hash.
@@ -102,11 +122,29 @@ module Planara
         fallback_label: 'Ground Coverage Limit'
       )
 
+      # -- Setback --
+      @min_setback = extract_limit(
+        metrics, violations,
+        metric_key: 'min_setback_m',
+        category: 'setback',
+        fallback_label: 'Minimum Setback'
+      )
+
+      # -- Open space --
+      @min_open_space = extract_limit(
+        metrics, violations,
+        metric_key: 'min_open_space_pct',
+        category: 'open_space',
+        fallback_label: 'Minimum Open Space'
+      )
+
       Logger.info(
         'limits_cache_populated',
         max_height_m: max_height_m,
         min_room_height_m: min_room_height_m,
-        max_coverage_pct: max_coverage_pct
+        max_coverage_pct: max_coverage_pct,
+        min_setback_m: min_setback_m,
+        min_open_space_pct: min_open_space_pct
       )
     end
 
@@ -115,6 +153,8 @@ module Planara
       @max_fsi = nil
       @min_room_height = nil
       @max_coverage = nil
+      @min_setback = nil
+      @min_open_space = nil
     end
 
     # -- internal helpers ------------------------------------------------------
