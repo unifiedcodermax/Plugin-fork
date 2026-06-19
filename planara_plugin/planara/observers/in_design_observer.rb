@@ -21,6 +21,19 @@ module Planara
     #   2. 100ms trailing-edge debounce collapses rapid-fire events.
     #   3. Short-circuits when the computed height hasn't changed.
     #   4. No HTTP calls — all checks are Ruby-side bounding-box math.
+    #
+    # Violation payload schema (standardized):
+    #   {
+    #     type:     String   — category key (height, room_height, fsi, setback, coverage)
+    #     severity: String   — "warning" (all Tier 2 are warnings, Tier 1 has authority)
+    #     current:  Float    — the measured value
+    #     limit:    Float    — the bylaw limit
+    #     excess:   Float    — how much the limit is exceeded by (always positive when violated)
+    #     unit:     String   — unit label ("m", "m²", "%", etc.)
+    #     source:   String   — provenance label, e.g. "Height Limit (Live)"
+    #     message:  String   — human-readable summary, e.g. "Height exceeds limit by 2.5m"
+    #     detail:   String   — secondary line with exact measurements
+    #   }
     class InDesignObserver < Sketchup::EntitiesObserver
       DEBOUNCE_S = 0.1  # 100ms — fast enough for visual feedback
 
@@ -111,6 +124,12 @@ module Planara
         # -- FSI check --
         check_fsi(model, warnings)
 
+        # -- Setback check --
+        check_setback(model, warnings)
+
+        # -- Coverage check --
+        check_coverage(model, warnings)
+
         # Push to UI
         if warnings.any?
           Planara::UI::ResultsDialog.update_in_design_warning(warnings)
@@ -126,6 +145,60 @@ module Planara
         end
       end
 
+      # -- Standardized violation builder ------------------------------------
+
+      # Build a standardized warning hash. Every check funnels through
+      # this so the UI can render them uniformly.
+      def build_warning(type:, current:, limit:, unit:, source:, detail: nil)
+        excess = (current - limit).abs.round(3)
+        message = "#{humanize_type(type)} exceeds limit by #{excess}#{unit}"
+        detail ||= "Current: #{current.round(2)}#{unit} | Limit: #{limit.round(2)}#{unit}"
+
+        {
+          type: type,
+          severity: 'warning',
+          current: current.round(3),
+          limit: limit,
+          excess: excess,
+          unit: unit,
+          source: "#{source} (Live)",
+          message: message,
+          detail: detail
+        }
+      end
+
+      # Build a warning for "below minimum" violations (room height).
+      def build_below_warning(type:, current:, limit:, unit:, source:, detail: nil)
+        deficit = (limit - current).abs.round(3)
+        message = "#{humanize_type(type)} below minimum by #{deficit}#{unit}"
+        detail ||= "Current: #{current.round(2)}#{unit} | Minimum: #{limit.round(2)}#{unit}"
+
+        {
+          type: type,
+          severity: 'warning',
+          current: current.round(3),
+          limit: limit,
+          excess: deficit,
+          unit: unit,
+          source: "#{source} (Live)",
+          message: message,
+          detail: detail
+        }
+      end
+
+      def humanize_type(type)
+        case type
+        when 'height' then 'Height'
+        when 'room_height' then 'Room height'
+        when 'fsi' then 'FSI'
+        when 'setback' then 'Setback'
+        when 'coverage' then 'Ground coverage'
+        else type.to_s.gsub('_', ' ').capitalize
+        end
+      end
+
+      # -- Individual checks -------------------------------------------------
+
       def check_building_height(model, warnings)
         limit_info = LimitsCache.max_height
         return unless limit_info
@@ -137,14 +210,14 @@ module Planara
         @last_height = height
 
         if height > max_h
-          warnings << {
+          warnings << build_warning(
             type: 'height',
-            message: "Height #{height.round(1)}m exceeds limit #{max_h.round(1)}m",
-            detail: "Building height: #{height.round(2)}m | Maximum allowed: #{max_h.round(1)}m",
+            current: height,
+            limit: max_h,
+            unit: 'm',
             source: limit_info[:label] || 'Height Limit',
-            current: height.round(2),
-            limit: max_h
-          }
+            detail: "Building height: #{height.round(2)}m | Maximum allowed: #{max_h.round(1)}m | Exceeded by: #{(height - max_h).round(2)}m"
+          )
         end
       end
 
@@ -177,25 +250,20 @@ module Planara
 
         if violating_floors.any?
           count = violating_floors.size
-          message = if count == 1
-                      "Floor #{worst_level} height #{worst_height.round(2)}m below minimum #{min_h.round(2)}m"
-                    else
-                      "#{count} floors below minimum #{min_h.round(2)}m (Worst: Floor #{worst_level} at #{worst_height.round(2)}m)"
-                    end
           detail = if count == 1
-                     "Floor #{worst_level}: #{worst_height.round(2)}m | Minimum required: #{min_h.round(2)}m"
+                     "Floor #{worst_level}: #{worst_height.round(2)}m | Minimum required: #{min_h.round(2)}m | Below by: #{(min_h - worst_height).round(2)}m"
                    else
-                     "#{count} non-compliant floors. Worst is Floor #{worst_level} at #{worst_height.round(2)}m"
+                     "#{count} floors below minimum. Worst: Floor #{worst_level} at #{worst_height.round(2)}m (below by #{(min_h - worst_height).round(2)}m)"
                    end
 
-          warnings << {
+          warnings << build_below_warning(
             type: 'room_height',
-            message: message,
-            detail: detail,
+            current: worst_height,
+            limit: min_h,
+            unit: 'm',
             source: limit_info[:label] || 'Room Height Minimum',
-            current: worst_height.round(2),
-            limit: min_h
-          }
+            detail: detail
+          )
         end
 
         @last_floor_warnings = new_floor_warnings
@@ -212,14 +280,71 @@ module Planara
         return unless fsi
 
         if fsi > max_fsi
-          warnings << {
+          warnings << build_warning(
             type: 'fsi',
-            message: "FSI #{fsi} exceeds limit #{max_fsi}",
-            detail: "Approximate FSI: #{fsi} | Maximum allowed: #{max_fsi}",
-            source: limit_info[:label] || 'FSI Limit',
             current: fsi,
-            limit: max_fsi
-          }
+            limit: max_fsi,
+            unit: '',
+            source: limit_info[:label] || 'FSI Limit',
+            detail: "FSI: #{fsi} | Maximum allowed: #{max_fsi} | Exceeded by: #{(fsi - max_fsi).round(2)}"
+          )
+        end
+      end
+
+      def check_setback(model, warnings)
+        limit_info = LimitsCache.min_setback
+        return unless limit_info
+
+        min_setback = limit_info[:value]
+        return unless min_setback && min_setback > 0
+
+        result = Geometry::QuickChecks.approximate_setback(model)
+        return unless result
+
+        min_dist = result[:min_distance_m]
+        worst_level = result[:worst_level]
+
+        if min_dist < min_setback - 0.005 # same tolerance as engine
+          deficit = (min_setback - min_dist).round(3)
+          detail = "Floor #{worst_level}: #{min_dist.round(2)}m from boundary | Required: #{min_setback.round(2)}m | Violated by: #{deficit.round(2)}m"
+
+          # Report per-floor violations if multiple floors are affected
+          violating_floors = result[:per_floor].select { |f| f[:distance_m] < min_setback - 0.005 }
+          if violating_floors.size > 1
+            floor_list = violating_floors.map { |f| "Floor #{f[:level]}: #{f[:distance_m]}m" }.join(', ')
+            detail += " | All violations: #{floor_list}"
+          end
+
+          warnings << build_below_warning(
+            type: 'setback',
+            current: min_dist,
+            limit: min_setback,
+            unit: 'm',
+            source: limit_info[:label] || 'Setback Minimum',
+            detail: detail
+          )
+        end
+      end
+
+      def check_coverage(model, warnings)
+        limit_info = LimitsCache.max_coverage
+        return unless limit_info
+
+        max_coverage = limit_info[:value]
+        return unless max_coverage && max_coverage > 0
+
+        coverage = Geometry::QuickChecks.approximate_coverage(model)
+        return unless coverage
+
+        if coverage > max_coverage + 0.01 # small tolerance for float drift
+          warnings << build_warning(
+            type: 'coverage',
+            current: coverage,
+            limit: max_coverage,
+            unit: '%',
+            source: limit_info[:label] || 'Coverage Limit',
+            detail: "Ground coverage: #{coverage.round(1)}% | Maximum allowed: #{max_coverage.round(1)}% | Exceeded by: #{(coverage - max_coverage).round(1)}%"
+          )
         end
       end
     end
