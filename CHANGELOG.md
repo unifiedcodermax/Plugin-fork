@@ -3,6 +3,17 @@
 All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
+
+## [0.7.0] — 2026-06-19
+
+Feature release adding comprehensive live (in-design) bylaw violation detection with exact measurements.
+
+### Added — plugin
+- **Live Setback & Coverage Checks:** `InDesignObserver` now validates setback and ground coverage mid-gesture.
+- **Exact Violation Amounts:** All live checks now explicitly state the violation amount (e.g., "Setback below minimum by 1.5m").
+- **Standardized Violation Schema:** Refactored live validation payload to use a consistent schema with prominent visual styling in the results banner.
+- **LimitsCache Expansion:** Caches `min_setback` and `min_open_space` from the engine for real-time evaluation.
+
 ## [0.6.1] — 2026-06-16
 
 Feature release improving real-time live check behavior and adding FSI warnings.
