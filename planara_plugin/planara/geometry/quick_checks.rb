@@ -189,6 +189,48 @@ module Planara
         ((ground_area_sqm / plot_area_sqm) * 100.0).round(2)
       end
 
+      # -- single-entity queries (for entity-scoped Live Check) -----------------
+
+      # Height for a single floor entity in meters.
+      #
+      # @param entity [Sketchup::Group, Sketchup::ComponentInstance]
+      # @return [Float] height in meters (falls back to 3.0 for degenerate geometry)
+      def single_floor_height(entity)
+        bb = entity.bounds
+        height_m = Units.inches_to_meters(bb.max.z - bb.min.z)
+        height_m <= 0.0 ? 3.0 : height_m.round(3)
+      end
+
+      # Minimum axis-aligned setback distance for a single floor entity
+      # against the plot boundary.
+      #
+      # @param model [Sketchup::Model]
+      # @param entity [Sketchup::Group, Sketchup::ComponentInstance]
+      # @return [Float, nil] minimum distance in meters, or nil if no plot found
+      def single_floor_setback(model, entity)
+        plot_entity = find_plot_entity(model)
+        return nil unless plot_entity
+
+        plot_bb = plot_entity.bounds
+        plot_min_x = Units.inches_to_meters(plot_bb.min.x)
+        plot_max_x = Units.inches_to_meters(plot_bb.max.x)
+        plot_min_y = Units.inches_to_meters(plot_bb.min.y)
+        plot_max_y = Units.inches_to_meters(plot_bb.max.y)
+
+        bb = entity.bounds
+        floor_min_x = Units.inches_to_meters(bb.min.x)
+        floor_max_x = Units.inches_to_meters(bb.max.x)
+        floor_min_y = Units.inches_to_meters(bb.min.y)
+        floor_max_y = Units.inches_to_meters(bb.max.y)
+
+        dist_left   = floor_min_x - plot_min_x
+        dist_right  = plot_max_x - floor_max_x
+        dist_front  = floor_min_y - plot_min_y
+        dist_back   = plot_max_y - floor_max_y
+
+        [dist_left, dist_right, dist_front, dist_back].min.round(3)
+      end
+
       # -- entity discovery helpers --------------------------------------------
       #
       # CRITICAL: Only yield entities that are UNIQUELY named "Floor N".
