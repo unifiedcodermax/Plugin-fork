@@ -4,6 +4,10 @@ All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
 
+## [0.8.1] — 2026-06-20
+
+Hotfix release correcting version discrepancies that caused release assets to be generated with outdated version tags.
+
 ## [0.7.2] — 2026-06-19
 
 Feature release improving Live Check context-awareness and violation readability.
