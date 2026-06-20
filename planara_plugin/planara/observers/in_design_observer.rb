@@ -19,13 +19,15 @@ module Planara
     #   1. 100ms trailing-edge debounce collapses rapid-fire events.
     #   2. No HTTP calls — all checks are Ruby-side bounding-box math.
     #
-    # Entity-scoped Live Check:
-    #   Live Check shows violations ONLY for the currently selected
-    #   SketchUp entity. If the selection is a nested element (face,
-    #   edge, sub-group inside a Floor group), it walks up the parent
-    #   hierarchy to resolve to the containing tracked entity (Floor
-    #   group). Building-wide checks (height, FSI, coverage) never
-    #   appear in Live Check — they belong to Live Compliance.
+    # Editing-context-scoped Live Check:
+    #   Live Check is scoped to the architect's current editing context.
+    #   Editing context is determined by:
+    #     1. Selected entity (model.selection.first)
+    #     2. Otherwise active editing container (model.active_path.last)
+    #   If the user is editing inside a floor group (even with nothing
+    #   selected), Live Check shows violations for that floor.
+    #   Building-wide checks (height, FSI, coverage) never appear in
+    #   Live Check — they belong to Live Compliance.
     #
     # Violation payload schema (standardized):
     #   {
@@ -192,9 +194,14 @@ module Planara
 
       # -- Hierarchy resolution ------------------------------------------------
 
-      # Walk up from ``entity`` through its parent chain looking for a
-      # tracked container (currently: Floor groups). Uses persistent_id
-      # matching — no name-based type inference.
+      # Resolve the target entity to a tracked container (currently:
+      # Floor groups) using only authoritative sources:
+      #   1. The entity's own persistent_id
+      #   2. model.active_path (SketchUp's known editing hierarchy)
+      #
+      # IMPORTANT: Never use parent.instances.first for resolution.
+      # That guesses when multiple instances exist and can resolve to
+      # the wrong container.
       #
       # @param model [Sketchup::Model]
       # @param entity [Sketchup::Entity] the selected or active-path entity
@@ -210,57 +217,18 @@ module Planara
           }
         end
 
-        # Walk up from the target entity
-        current = entity
-        while current && !current.is_a?(Sketchup::Model)
-          # Check if this entity itself is tracked
-          if current.respond_to?(:persistent_id) && tracked.key?(current.persistent_id)
-            return tracked[current.persistent_id]
-          end
+        # Check if the entity itself is a tracked container
+        if entity.respond_to?(:persistent_id) && tracked.key?(entity.persistent_id)
+          return tracked[entity.persistent_id]
+        end
 
-          # Move up the hierarchy
-          parent = current.respond_to?(:parent) ? current.parent : nil
-
-          if parent.is_a?(Sketchup::ComponentDefinition)
-            # The parent is a definition — we need the instance.
-            # Prefer the active_path to find the correct instance
-            # (handles multi-instance definitions correctly).
-            parent_instance = nil
-            if model.active_path
-              model.active_path.each_with_index do |path_entity, idx|
-                if path_entity.respond_to?(:definition) &&
-                   path_entity.definition == parent
-                  parent_instance = path_entity
-                  break
-                end
-              end
+        # Walk up the active_path (the authoritative editing hierarchy)
+        # to find the nearest tracked container.
+        if model.active_path
+          model.active_path.reverse_each do |path_entity|
+            if tracked.key?(path_entity.persistent_id)
+              return tracked[path_entity.persistent_id]
             end
-            # Fallback: first instance (correct for single-instance floors)
-            parent_instance ||= parent.instances.first
-            current = parent_instance
-          elsif parent.is_a?(Sketchup::Entities)
-            # parent is an Entities collection — its parent is the
-            # Model or a ComponentDefinition
-            owner = parent.parent
-            if owner.is_a?(Sketchup::ComponentDefinition)
-              parent_instance = nil
-              if model.active_path
-                model.active_path.each do |path_entity|
-                  if path_entity.respond_to?(:definition) &&
-                     path_entity.definition == owner
-                    parent_instance = path_entity
-                    break
-                  end
-                end
-              end
-              parent_instance ||= owner.instances.first
-              current = parent_instance
-            else
-              # Owner is the Model — we've reached the top
-              current = nil
-            end
-          else
-            current = nil
           end
         end
 
