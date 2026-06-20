@@ -191,29 +191,40 @@
       margin-top: 3px;
       font-style: italic;
     }
-    /* -- Background violations (other-floor violations in Live Compliance table) -- */
-    .bg-separator td {
-      padding: 8px;
-      font-size: 10px;
-      font-weight: 600;
-      color: #c2410c;
-      background: #fff7ed;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-bottom: 2px solid #fb923c;
-      border-top: 2px solid #fb923c;
+    .in-design-banner .live-prompt {
+      font-size: 13px;
+      color: #78350f;
+      padding: 4px 0;
     }
-    tr.bg-violation {
-      background: #fffbf5;
+    .in-design-banner.no-violations {
+      border-color: #86efac;
+      background: #f0fdf4;
+      color: #166534;
     }
-    tr.bg-violation:hover {
-      background: #fff7ed;
+    .in-design-banner.no-violations .live-header {
+      border-bottom-color: #86efac;
+      color: #166534;
     }
-    tr.bg-violation td {
-      border-left: 3px solid #fb923c;
+    .in-design-banner.no-violations .live-dot {
+      background: #22c55e;
     }
-    tr.bg-violation td:first-child {
-      padding-left: 5px;
+    .in-design-banner.no-violations .live-prompt {
+      color: #166534;
+    }
+    .in-design-banner.no-selection {
+      border-color: #93c5fd;
+      background: #eff6ff;
+      color: #1e40af;
+    }
+    .in-design-banner.no-selection .live-header {
+      border-bottom-color: #93c5fd;
+      color: #1e40af;
+    }
+    .in-design-banner.no-selection .live-dot {
+      background: #3b82f6;
+    }
+    .in-design-banner.no-selection .live-prompt {
+      color: #1e40af;
     }
   </style>
 </head>
@@ -232,7 +243,6 @@
       </tr>
     </thead>
     <tbody id="violations-body"></tbody>
-    <tbody id="background-violations-body"></tbody>
   </table>
   <div id="hints-container" style="display:none; margin-top:16px;"></div>
 
@@ -274,11 +284,6 @@
       var table = document.getElementById('violations-table');
       var body = document.getElementById('violations-body');
       body.innerHTML = '';
-
-      // Clear background violations too (they'll be re-pushed by
-      // the observer via boot.rb's show_validation_result)
-      var bgBody = document.getElementById('background-violations-body');
-      bgBody.innerHTML = '';
 
       if (violations.length) {
         table.style.display = '';
@@ -375,38 +380,28 @@
       banner.innerHTML = '';
     };
 
-    // Show background violations (non-active-floor violations) in the
-    // Live Compliance table. These are floor-specific violations for
-    // floors the architect is NOT currently editing.
-    Planara.onBackgroundViolations = function (violations) {
-      var bgBody = document.getElementById('background-violations-body');
-      bgBody.innerHTML = '';
+    // Show prompt when nothing is selected.
+    Planara.onNoSelection = function () {
+      var banner = document.getElementById('in-design-banner');
+      banner.className = 'in-design-banner visible no-selection';
+      banner.innerHTML =
+        '<div class="live-header">' +
+        '<span class="live-dot"></span>' +
+        ' Live Check' +
+        '</div>' +
+        '<div class="live-prompt">Select a component or design element to view contextual violations.</div>';
+    };
 
-      if (!violations || !violations.length) return;
-
-      // Make sure the table is visible
-      var table = document.getElementById('violations-table');
-      table.style.display = '';
-
-      // Add separator row
-      var sepTr = document.createElement('tr');
-      sepTr.className = 'bg-separator';
-      sepTr.innerHTML = '<td colspan="3">⚠ Live Check — other floors (' +
-        violations.length + ' violation' + (violations.length === 1 ? '' : 's') + ')</td>';
-      bgBody.appendChild(sepTr);
-
-      // Add each violation as a row
-      violations.forEach(function (v) {
-        var tr = document.createElement('tr');
-        tr.className = 'bg-violation';
-        tr.innerHTML =
-          '<td><span class="pill live">LIVE</span></td>' +
-          '<td><code>' + escapeHtml(v.type || '') + '</code></td>' +
-          '<td>' + escapeHtml(v.message || '') +
-          (v.detail ? '<br><span style="font-size:11px;color:var(--muted)">' + escapeHtml(v.detail) + '</span>' : '') +
-          '</td>';
-        bgBody.appendChild(tr);
-      });
+    // Show "no violations" when the selected entity has no traceable violations.
+    Planara.onNoViolationsForSelection = function () {
+      var banner = document.getElementById('in-design-banner');
+      banner.className = 'in-design-banner visible no-violations';
+      banner.innerHTML =
+        '<div class="live-header">' +
+        '<span class="live-dot"></span>' +
+        ' ✅ Live Check' +
+        '</div>' +
+        '<div class="live-prompt">No violations detected for this element.</div>';
     };
 
     function escapeHtml(s) {
