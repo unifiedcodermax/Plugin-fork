@@ -14,6 +14,8 @@ module Planara
   #        - If the engine is already responding on the configured
   #          URL (someone ran it manually), reuse it: don't spawn
   #          a duplicate.
+  #        - If a PID file exists from a crashed previous session,
+  #          kill the orphaned process and re-spawn fresh.
   #        - Otherwise spawn `planara-engine` (or the command in
   #          PLANARA_ENGINE_CMD) detached, with stdio redirected to
   #          a log file under planara_engine/.run/.
@@ -24,11 +26,21 @@ module Planara
   #          short grace period.
   #        - If we attached to a pre-existing process, leave it
   #          alone — we don't own it.
+  #        - Remove the PID file so the next session doesn't
+  #          mistakenly kill a legitimately running engine.
   module EngineSupervisor
     POLL_INTERVAL_S = 0.25
     STOP_GRACE_S    = 5.0
 
     module_function
+
+    def run_dir
+      File.expand_path('../../.run', Config.plugin_root)
+    end
+
+    def pid_file_path
+      File.join(run_dir, 'engine.pid')
+    end
 
     def status
       {
@@ -44,11 +56,21 @@ module Planara
 
     def start
       if engine_reachable?
-        Logger.info('engine_already_running', url: Config.engine_url)
-        return :already_running
+        # Check if this is a stale process from a crashed session
+        if stale_pid_file?
+          stale_pid = read_pid_file
+          Logger.warn('engine_stale_process', pid: stale_pid)
+          kill_pid(stale_pid) rescue nil
+          delete_pid_file
+          sleep 0.5
+        else
+          Logger.info('engine_already_running', url: Config.engine_url)
+          return :already_running
+        end
       end
 
       spawn_engine
+      write_pid_file(@pid)
       wait_for_ready
       :started
     rescue EngineClient::EngineError, RuntimeError => e
@@ -63,6 +85,7 @@ module Planara
       Logger.info('engine_stopping', pid: @pid)
       kill_pid(@pid)
       @pid = nil
+      delete_pid_file
       :stopped
     end
 
@@ -75,9 +98,52 @@ module Planara
       false
     end
 
+    # -- PID file management -------------------------------------------------
+
+    def write_pid_file(pid)
+      FileUtils.mkdir_p(run_dir)
+      File.write(pid_file_path, pid.to_s)
+    rescue StandardError => e
+      Logger.warn('pid_file_write_failed', error: e.message)
+    end
+
+    def read_pid_file
+      return nil unless File.exist?(pid_file_path)
+      File.read(pid_file_path).strip.to_i
+    rescue StandardError
+      nil
+    end
+
+    def delete_pid_file
+      File.delete(pid_file_path) if File.exist?(pid_file_path)
+    rescue StandardError => e
+      Logger.warn('pid_file_delete_failed', error: e.message)
+    end
+
+    # A PID file is "stale" when it exists but the PID it records is
+    # not the one we spawned in THIS session (i.e., @pid is nil or
+    # different). This means a previous SketchUp session crashed
+    # without calling stop, leaving an orphaned engine process.
+    def stale_pid_file?
+      stored = read_pid_file
+      return false unless stored && stored > 0
+      # If we spawned it ourselves this session, it's not stale
+      return false if @pid && @pid == stored
+      # Verify the process is actually running
+      begin
+        Process.kill(0, stored)
+        true  # Process exists and we didn't spawn it — stale
+      rescue Errno::ESRCH
+        # Process is dead; clean up the PID file
+        delete_pid_file
+        false
+      rescue Errno::EPERM
+        true  # Process exists but owned by another user — treat as stale
+      end
+    end
+
     def spawn_engine
       cmd = resolve_engine_cmd
-      run_dir = File.expand_path('../../.run', Config.plugin_root)
       FileUtils.mkdir_p(run_dir)
       log_path = File.join(run_dir, 'engine.log')
 
