@@ -153,6 +153,7 @@ module Planara
       def find_plot(model)
         model.entities.find do |e|
           (e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)) &&
+            e.valid? &&
             entity_name(e) =~ PLOT_NAME_REGEX
         end
       end
@@ -161,6 +162,7 @@ module Planara
         out = []
         model.entities.each do |e|
           next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+          next unless e.valid?
           name = entity_name(e)
           if (match = FLOOR_NAME_REGEX.match(name))
             out << [match[1].to_i, e]
@@ -229,11 +231,13 @@ module Planara
       # -- polygon extraction --------------------------------------------------
 
       def polygon_from(entity)
+        return nil unless entity.valid?
         faces = inner_entities(entity).grep(Sketchup::Face)
-        horiz = faces.select { |f| horizontal?(f) }
+        horiz = faces.select { |f| f.valid? && horizontal?(f) }
         return nil if horiz.empty?
 
         face = horiz.max_by(&:area)
+        return nil unless face.valid?
         verts = face.outer_loop.vertices.map { |v| Units.point_to_xy_m(v.position) }
         {
           exterior: verts,
@@ -242,6 +246,7 @@ module Planara
       end
 
       def floor_payload(level, entity)
+        return nil unless entity.valid?
         poly = polygon_from(entity)
         return nil unless poly
 
@@ -314,9 +319,12 @@ module Planara
         # SketchUp raises if you start_operation inside another one.
         # The safest pattern: attempt start; if it raises, we're
         # already inside one — just set the name.
+        # The 4th argument (transparent = true) prevents this
+        # operation from firing observer callbacks, which avoids
+        # the re-entrancy loop: auto_rename → commit → observer → validate → auto_rename.
         began = false
         begin
-          model.start_operation('Planara auto-detect', true)
+          model.start_operation('Planara auto-detect', true, false, true)
           began = true
         rescue StandardError
           # Already inside an operation — that's fine.

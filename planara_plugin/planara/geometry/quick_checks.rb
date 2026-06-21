@@ -262,6 +262,7 @@ module Planara
           # Only top-level Groups are floor containers.
           # ComponentInstances of floor definitions are copies/debris.
           next unless e.is_a?(Sketchup::Group)
+          next unless e.valid?
 
           name = e.name.to_s.strip
           match = FLOOR_NAME_REGEX.match(name)
@@ -280,6 +281,7 @@ module Planara
       def find_plot_entity(model)
         model.entities.find do |e|
           next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+          next unless e.valid?
           name = entity_name(e)
           name =~ PLOT_NAME_REGEX
         end
