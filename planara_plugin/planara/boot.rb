@@ -192,7 +192,18 @@ module Planara
     # transport errors also pop a dialog; otherwise they are pushed
     # to the Results panel's error banner so the architect gets
     # immediate feedback without modal interruptions.
+    #
+    # Stability guards:
+    #   1. @_validating prevents re-entrancy: auto_rename inside
+    #      extraction triggers onTransactionCommit, which would
+    #      schedule another live_validate. The guard breaks the loop.
+    #   2. The HTTP POST runs in a background Thread so the UI never
+    #      freezes waiting for the engine. Extraction MUST stay on
+    #      the main thread (SketchUp API is not thread-safe).
     def live_validate(noisy: false)
+      return if @_validating
+      @_validating = true
+
       model = Sketchup.active_model
       snapshot = Geometry::Extractor.extract(
         model: model,
@@ -207,8 +218,33 @@ module Planara
         overlays: snapshot[:project][:overlays]
       )
 
-      response = EngineClient.validate(snapshot)
-      show_validation_result(response)
+      if noisy
+        # User-triggered actions (menu clicks) stay synchronous so
+        # dialogs and error messages appear in the expected order.
+        response = EngineClient.validate(snapshot)
+        show_validation_result(response)
+      else
+        # Live-loop: move the HTTP call off the main thread so the
+        # SketchUp UI never freezes waiting for the engine.
+        Thread.new do
+          begin
+            response = EngineClient.validate(snapshot)
+            # Marshal the result back to the main thread — SketchUp
+            # UI calls are not thread-safe.
+            ::UI.start_timer(0, false) { show_validation_result(response) }
+          rescue EngineClient::EngineError => e
+            ::UI.start_timer(0, false) do
+              Logger.warn('validate_failed', code: e.code, message: e.message, noisy: false)
+              UI::ResultsDialog.update_error(error_type: 'engine', message: e.message)
+            end
+          rescue StandardError => e
+            ::UI.start_timer(0, false) do
+              Logger.warn('validate_thread_error', error: e.message)
+              UI::ResultsDialog.update_error(error_type: 'engine', message: e.message)
+            end
+          end
+        end
+      end
     rescue Geometry::Extractor::ExtractionError => e
       Logger.warn('extract_failed', error: e.message, noisy: noisy)
       UI::ResultsDialog.update_error(error_type: 'extraction', message: e.message)
@@ -220,6 +256,8 @@ module Planara
       Logger.warn('validate_failed', code: e.code, message: e.message, noisy: noisy)
       UI::ResultsDialog.update_error(error_type: 'engine', message: e.message)
       ::UI.messagebox("Validation failed: #{e.message}") if noisy
+    ensure
+      @_validating = false
     end
 
     # Live-loop lifecycle -------------------------------------------------
