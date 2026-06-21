@@ -4,6 +4,17 @@ All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
 
+## [0.8.3] — 2026-06-21
+
+Stability release containing defensive patches to eliminate SketchUp crashes and UI freezes.
+
+### Fixed — plugin
+- **UI Freezes:** Moved the `EngineClient.validate` HTTP call to a background thread to prevent SketchUp's UI from hanging for up to 5 seconds per model edit.
+- **Cascading Re-entrancy Loops:** Added a re-entrancy guard in `live_validate` and set `auto_rename` to use a transparent operation to prevent observer trigger loops.
+- **Segfault Crashes:** Added a `@detached` lifecycle safety flag to both `LiveValidator` and `InDesignObserver` to prevent timer callbacks from firing against closed or invalid models.
+- **Entity Access Crashes:** Added `.valid?` checks to all geometry discovery methods (`find_plot`, `find_floors`, `polygon_from`, `each_floor_entity`, etc.) to prevent C-level segfaults when entities are modified/deleted during a tool gesture.
+- **Ghost Sidecar Processes:** Implemented PID file management to detect and clean up orphaned engine processes left behind by crashed SketchUp sessions.
+
 ## [0.8.1] — 2026-06-20
 
 Hotfix release correcting version discrepancies that caused release assets to be generated with outdated version tags.
