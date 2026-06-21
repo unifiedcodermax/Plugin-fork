@@ -21,6 +21,7 @@ module Planara
         super()
         @on_fire = on_fire
         @timer_id = nil
+        @detached = false
         @in_design_observer = in_design_observer
         @last_active_entities = nil
       end
@@ -47,6 +48,7 @@ module Planara
       # Detach the observer. Idempotent — SketchUp's remove_observer
       # raises if the observer is already gone, so we swallow.
       def detach(model)
+        @detached = true
         model.remove_observer(self) if model
       rescue StandardError
         nil
@@ -55,9 +57,11 @@ module Planara
       end
 
       def schedule
+        return if @detached
         cancel_timer
         @timer_id = ::UI.start_timer(DEBOUNCE_S, false) do
           @timer_id = nil
+          next if @detached
           begin
             @on_fire.call
           rescue StandardError => e

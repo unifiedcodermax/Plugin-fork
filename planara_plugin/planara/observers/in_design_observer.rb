@@ -48,6 +48,7 @@ module Planara
       def initialize
         super()
         @timer_id = nil
+        @detached = false
         @last_warnings = []     # cache last live_check warnings for persistence
       end
 
@@ -67,6 +68,7 @@ module Planara
 
       # Detach from the entities collection. Idempotent.
       def detach(model)
+        @detached = true
         model.entities.remove_observer(self) if model
       rescue StandardError
         nil
@@ -117,9 +119,11 @@ module Planara
       private
 
       def schedule
+        return if @detached
         cancel_timer
         @timer_id = ::UI.start_timer(DEBOUNCE_S, false) do
           @timer_id = nil
+          next if @detached
           begin
             evaluate
           rescue StandardError => e
