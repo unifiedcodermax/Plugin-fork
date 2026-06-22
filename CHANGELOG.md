@@ -4,6 +4,10 @@ All notable changes to Planara are recorded here. Versions follow
 semver applied to the engine + plugin together — when a sprint
 lands across both, the same version covers both.
 
+## [0.8.4] — 2026-06-22
+
+Hotfix release correcting version discrepancies that caused release assets to be generated with outdated version tags.
+
 ## [0.8.3] — 2026-06-21
 
 Stability release containing defensive patches to eliminate SketchUp crashes and UI freezes.
