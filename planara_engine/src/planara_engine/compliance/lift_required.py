@@ -61,6 +61,7 @@ def evaluate(snapshot: Snapshot, rule: Rule) -> EvaluationResult:
 
     computed: dict[str, Any] = {
         "height_m": round(height_m, 4),
+        "building_height_m": round(height_m, 4),
         "height_threshold_m": height_threshold_m,
         "above_grade_floors": above_grade_count,
         "floor_threshold": floor_threshold,

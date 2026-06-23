@@ -58,6 +58,7 @@ def evaluate(snapshot: Snapshot, rule: Rule) -> EvaluationResult:
 
     computed: dict[str, Any] = {
         "height_m": round(height_m, 4),
+        "building_height_m": round(height_m, 4),
         "max_height_m": max_height_m,
         "above_grade_levels": [
             f.level for f in snapshot.building.floors if f.level >= 0
