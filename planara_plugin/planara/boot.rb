@@ -242,24 +242,15 @@ module Planara
         response = EngineClient.validate(snapshot)
         show_validation_result(response)
       else
-        # Live-loop: move the HTTP call off the main thread so the
-        # SketchUp UI never freezes waiting for the engine.
-        Thread.new do
-          begin
-            response = EngineClient.validate(snapshot)
-            # Marshal the result back to the main thread — SketchUp
-            # UI calls are not thread-safe.
-            ::UI.start_timer(0, false) { show_validation_result(response) }
-          rescue EngineClient::EngineError => e
-            ::UI.start_timer(0, false) do
-              Logger.warn('validate_failed', code: e.code, message: e.message, noisy: false)
-              UI::ResultsDialog.update_error(error_type: 'engine', message: e.message)
-            end
-          rescue StandardError => e
-            ::UI.start_timer(0, false) do
-              Logger.warn('validate_thread_error', error: e.message)
-              UI::ResultsDialog.update_error(error_type: 'engine', message: e.message)
-            end
+        # Live-loop: use Sketchup::Http::Request for non-blocking
+        # validation. The callback is guaranteed to run on the main
+        # thread, avoiding SketchUp's unsafe Thread.new behavior.
+        EngineClient.validate_async(snapshot) do |response, error|
+          if error
+            Logger.warn('validate_failed', code: error.code, message: error.message, noisy: false)
+            UI::ResultsDialog.update_error(error_type: 'engine', message: error.message)
+          else
+            show_validation_result(response)
           end
         end
       end

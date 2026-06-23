@@ -65,6 +65,43 @@ module Planara
       post('/validate', snapshot, authenticated: true)
     end
 
+    # Asynchronous non-blocking validation.
+    # Uses Sketchup::Http::Request to ensure the callback fires
+    # safely on the SketchUp main thread, avoiding the silent-drop
+    # bugs of `UI.start_timer` from Ruby threads.
+    def validate_async(snapshot, &block)
+      uri = uri_for('/validate')
+      req = ::Sketchup::Http::Request.new(uri.to_s, ::Sketchup::Http::POST)
+      req.headers = { 'Content-Type' => 'application/json' }
+      Session.auth_headers.each { |k, v| req.headers[k] = v }
+      req.body = JSON.generate(snapshot)
+
+      req.start do |_request, response|
+        if response.status_code.between?(200, 299)
+          begin
+            parsed = JSON.parse(response.body)
+            block.call(parsed, nil)
+          rescue JSON::ParserError => e
+            block.call(nil, EngineError.new("invalid JSON: #{e.message}"))
+          end
+        else
+          err =
+            begin
+              JSON.parse(response.body)['error'] || {}
+            rescue JSON::ParserError
+              {}
+            end
+          block.call(nil, EngineError.new(
+            err['message'] || "HTTP #{response.status_code}",
+            status: response.status_code,
+            code: err['code']
+          ))
+        end
+      end
+    rescue StandardError => e
+      block.call(nil, EngineError.new("transport error: #{e.class}: #{e.message}"))
+    end
+
     # -- /projects ---------------------------------------------------------
 
     # POST /projects — create a user-named regression-tracking
