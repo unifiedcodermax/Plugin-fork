@@ -14,7 +14,7 @@ require 'extensions.rb'
 module Planara
   EXTENSION_ID      = 'Planara'
   EXTENSION_NAME    = 'Planara — Building Byelaw Compliance'
-  EXTENSION_VERSION = '0.8.4'
+  EXTENSION_VERSION = '0.8.5'
 
   EXTENSION_ROOT    = File.expand_path('planara', __dir__)
   ENTRY_POINT       = File.join(EXTENSION_ROOT, 'boot.rb')
