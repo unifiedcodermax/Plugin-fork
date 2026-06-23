@@ -33,11 +33,10 @@ module Planara
         each_floor_entity(model) do |level, e|
           next if level < 0 # exclude basements
 
-          bb = e.bounds
-          height_m = Units.inches_to_meters(bb.max.z - bb.min.z)
+          height_m = slab_height_quick(e)
           height_m = 3.0 if height_m <= 0.0 # degenerate fallback
 
-          bottom_m = Units.inches_to_meters(bb.min.z)
+          bottom_m = Units.inches_to_meters(e.bounds.min.z)
           top_m = bottom_m + height_m
 
           min_bottom_m = bottom_m if min_bottom_m.nil? || bottom_m < min_bottom_m
@@ -57,8 +56,7 @@ module Planara
 
         result = {}
         each_floor_entity(model) do |level, e|
-          bb = e.bounds
-          height_m = Units.inches_to_meters(bb.max.z - bb.min.z)
+          height_m = slab_height_quick(e)
           height_m = 3.0 if height_m <= 0.0 # degenerate fallback
           result[level] = height_m.round(3)
         end
@@ -192,12 +190,13 @@ module Planara
       # -- single-entity queries (for entity-scoped Live Check) -----------------
 
       # Height for a single floor entity in meters.
+      # Uses slab-to-slab measurement when horizontal faces are
+      # available, falling back to bounding box.
       #
       # @param entity [Sketchup::Group, Sketchup::ComponentInstance]
       # @return [Float] height in meters (falls back to 3.0 for degenerate geometry)
       def single_floor_height(entity)
-        bb = entity.bounds
-        height_m = Units.inches_to_meters(bb.max.z - bb.min.z)
+        height_m = slab_height_quick(entity)
         height_m <= 0.0 ? 3.0 : height_m.round(3)
       end
 
@@ -295,6 +294,39 @@ module Planara
         when Sketchup::ComponentInstance
           (entity.name && !entity.name.strip.empty? ? entity.name : entity.definition.name).to_s.strip
         else ''
+        end
+      end
+
+      # Slab-to-slab height for a floor entity. Uses horizontal
+      # face Z-spans when 2+ horizontal faces exist, otherwise
+      # falls back to bounding box height. No logging — this
+      # runs during mid-gesture quick checks at 100ms intervals.
+      def slab_height_quick(entity)
+        entities = if entity.is_a?(Sketchup::Group)
+                     entity.entities
+                   elsif entity.is_a?(Sketchup::ComponentInstance)
+                     entity.definition.entities
+                   else
+                     return 0.0
+                   end
+
+        horiz = entities.grep(Sketchup::Face).select { |f|
+          f.valid? && (f.normal.samedirection?(Z_AXIS) || f.normal.samedirection?(Z_AXIS.reverse))
+        }
+
+        if horiz.length >= 2
+          transform = entity.transformation
+          z_values = []
+          horiz.each do |face|
+            face.vertices.each do |v|
+              z_values << (transform * v.position).z
+            end
+          end
+          unique_z = z_values.map { |z| Units.inches_to_meters(z) }.uniq
+          unique_z.max - unique_z.min
+        else
+          bb = entity.bounds
+          Units.inches_to_meters(bb.max.z - bb.min.z)
         end
       end
     end

@@ -250,8 +250,7 @@ module Planara
         poly = polygon_from(entity)
         return nil unless poly
 
-        bb = entity.bounds
-        height_m = Units.inches_to_meters(bb.max.z - bb.min.z)
+        height_m = slab_height(entity, level)
         height_m = 3.0 if height_m <= 0.0 # degenerate fallback
 
         is_habitable = attribute_or_default(entity, 'is_habitable', true)
@@ -262,6 +261,66 @@ module Planara
           height_m: height_m.round(3),
           is_habitable: is_habitable,
         }
+      end
+
+      # Compute floor height from horizontal face Z-spans.
+      #
+      # When a floor group contains 2+ horizontal faces (floor slab
+      # and ceiling slab), measure the Z-distance between them using
+      # the group's world-space transformation. This gives the true
+      # slab-to-slab height.
+      #
+      # Falls back to bounding box height when only 0-1 horizontal
+      # faces exist (e.g. a single slab plane).
+      #
+      # Diagnostic logging outputs all detected Z-elevations per
+      # floor so the algorithm can be validated against real models.
+      def slab_height(entity, level = nil)
+        faces = inner_entities(entity).grep(Sketchup::Face)
+        horiz = faces.select { |f| f.valid? && horizontal?(f) }
+
+        if horiz.length >= 2
+          # Collect world-space Z coordinates of horizontal face vertices.
+          transform = entity.transformation
+          z_values = []
+          horiz.each do |face|
+            face.vertices.each do |v|
+              world_pt = transform * v.position
+              z_values << world_pt.z
+            end
+          end
+
+          # Unique Z-elevations (rounded to avoid float noise)
+          unique_z = z_values.map { |z| Units.inches_to_meters(z).round(4) }.uniq.sort
+          height_m = unique_z.last - unique_z.first
+
+          Logger.info(
+            'slab_height_detected',
+            level: level,
+            z_elevations_m: unique_z,
+            slab_height_m: height_m.round(3),
+            face_count: horiz.length,
+            method: 'slab_span'
+          )
+
+          height_m
+        else
+          # Fallback: bounding box height
+          bb = entity.bounds
+          height_m = Units.inches_to_meters(bb.max.z - bb.min.z)
+
+          Logger.info(
+            'slab_height_detected',
+            level: level,
+            bbox_min_z_m: Units.inches_to_meters(bb.min.z).round(4),
+            bbox_max_z_m: Units.inches_to_meters(bb.max.z).round(4),
+            slab_height_m: height_m.round(3),
+            face_count: horiz.length,
+            method: 'bbox_fallback'
+          )
+
+          height_m
+        end
       end
 
       # -- helpers -------------------------------------------------------------
