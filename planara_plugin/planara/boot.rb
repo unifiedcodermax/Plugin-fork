@@ -205,6 +205,24 @@ module Planara
       @_validating = true
 
       model = Sketchup.active_model
+
+      # Pre-flight: on a blank model with no groups/components,
+      # extraction will always fail with "no plot found". Show a
+      # friendly guidance message instead of a red error banner
+      # that re-fires on every transaction commit.
+      unless noisy
+        has_groups = model && model.entities.any? { |e|
+          (e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)) && e.valid?
+        }
+        unless has_groups
+          UI::ResultsDialog.update_error(
+            error_type: 'guidance',
+            message: 'No geometry detected yet. Draw your plot boundary as a group named "Plot", then add floor groups named "Floor 0", "Floor 1", etc.'
+          )
+          return
+        end
+      end
+
       snapshot = Geometry::Extractor.extract(
         model: model,
         project: Session.project,

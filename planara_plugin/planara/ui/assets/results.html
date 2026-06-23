@@ -109,6 +109,12 @@
       line-height: 1.5;
     }
     .error-banner.visible { display: block; }
+    .error-banner.guidance {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      color: #1e40af;
+    }
+    .error-banner.guidance .icon { color: #3b82f6; }
     .error-banner .icon { margin-right: 6px; }
     .error-banner .hint {
       display: block;
@@ -321,12 +327,18 @@
       var banner = document.getElementById('error-banner');
       var msg = escapeHtml(payload.message || 'An error occurred.');
       var hint = '';
-      if (payload.error_type === 'extraction') {
+      var icon = '⚠️';
+      banner.classList.remove('guidance');
+      if (payload.error_type === 'guidance') {
+        icon = 'ℹ️';
+        hint = '<span class="hint">The compliance check will run automatically once geometry is detected.</span>';
+        banner.classList.add('guidance');
+      } else if (payload.error_type === 'extraction') {
         hint = '<span class="hint">Fix the geometry and the check will re-run automatically.</span>';
       } else if (payload.error_type === 'engine') {
         hint = '<span class="hint">The compliance engine may be restarting. It will retry automatically.</span>';
       }
-      banner.innerHTML = '<span class="icon">⚠️</span>' + msg + hint;
+      banner.innerHTML = '<span class="icon">' + icon + '</span>' + msg + hint;
       banner.classList.add('visible');
     };
 
