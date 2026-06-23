@@ -156,7 +156,7 @@ module Planara
         unless target
           Planara::UI::ResultsDialog.show_no_selection
           @last_warnings = []
-          ::Sketchup.set_status_text('', SB_PROMPT)
+          (::Sketchup.set_status_text('') rescue nil)
           return
         end
 
@@ -167,7 +167,7 @@ module Planara
           # Selected entity is not inside any tracked container
           Planara::UI::ResultsDialog.show_no_violations_for_selection
           @last_warnings = []
-          ::Sketchup.set_status_text('', SB_PROMPT)
+          (::Sketchup.set_status_text('') rescue nil)
           return
         end
 
@@ -186,13 +186,10 @@ module Planara
         if live_check.any?
           Planara::UI::ResultsDialog.update_in_design_warning(live_check)
           first = live_check.first
-          ::Sketchup.set_status_text(
-            "\u26A0 #{first[:message]}",
-            SB_PROMPT
-          )
+          (::Sketchup.set_status_text("\u26A0 #{first[:message]}") rescue nil)
         else
           Planara::UI::ResultsDialog.show_no_violations_for_selection
-          ::Sketchup.set_status_text('', SB_PROMPT)
+          (::Sketchup.set_status_text('') rescue nil)
         end
       end
 
