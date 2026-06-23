@@ -33,39 +33,42 @@ module Planara
       return if ENV['PLANARA_SKIP_UPDATE_CHECK'] == '1'
 
       @checked = true
-      Thread.new { do_check }
+      do_check_async
     end
 
-    # Visible for testing — synchronous version of the check.
-    # Returns { update_available: bool, latest: "x.y.z", current: "x.y.z", url: "..." }
-    def do_check
-      current = current_version
-      latest_info = fetch_latest_release
-      return unless latest_info
+    def do_check_async
+      req = ::Sketchup::Http::Request.new(RELEASES_URL, ::Sketchup::Http::GET)
+      req.headers = {
+        'Accept' => 'application/vnd.github+json',
+        'User-Agent' => "Planara-Plugin/#{current_version}"
+      }
 
-      latest_tag = latest_info['tag_name'].to_s.sub(/\Av/, '')
-      download_url = release_download_url(latest_info)
+      req.start do |_request, response|
+        next unless response.status_code == 200
 
-      if newer?(latest_tag, current)
-        Logger.info(
-          'update_available',
-          current: current,
-          latest: latest_tag,
-          url: download_url
-        )
-        notify_user(current, latest_tag, download_url)
-      else
-        Logger.info('update_check_ok', current: current, latest: latest_tag)
+        begin
+          latest_info = JSON.parse(response.body)
+          current = current_version
+          latest_tag = latest_info['tag_name'].to_s.sub(/\Av/, '')
+          download_url = release_download_url(latest_info)
+
+          if newer?(latest_tag, current)
+            Logger.info(
+              'update_available',
+              current: current,
+              latest: latest_tag,
+              url: download_url
+            )
+            notify_user(current, latest_tag, download_url)
+          else
+            Logger.info('update_check_ok', current: current, latest: latest_tag)
+          end
+        rescue StandardError => e
+          Logger.debug('update_check_failed', error: e.message)
+        end
       end
-
-      { update_available: newer?(latest_tag, current),
-        latest: latest_tag,
-        current: current,
-        url: download_url }
     rescue StandardError => e
-      # Never crash the plugin for a failed update check.
       Logger.debug('update_check_failed', error: e.message)
-      nil
     end
 
     # -- internals ---------------------------------------------------------
@@ -87,26 +90,6 @@ module Planara
       (remote_parts <=> local_parts) == 1
     end
 
-    def fetch_latest_release
-      uri = URI.parse(RELEASES_URL)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = true
-      http.open_timeout = TIMEOUT_S
-      http.read_timeout = TIMEOUT_S
-
-      req = Net::HTTP::Get.new(uri.request_uri)
-      req['Accept'] = 'application/vnd.github+json'
-      req['User-Agent'] = "Planara-Plugin/#{current_version}"
-
-      response = http.request(req)
-      return nil unless response.code.to_i == 200
-
-      JSON.parse(response.body)
-    rescue StandardError => e
-      Logger.debug('github_api_error', error: e.message)
-      nil
-    end
-
     # Find the .rbz asset URL for the current platform.
     def release_download_url(release_info)
       platform = Gem.win_platform? ? 'windows' : 'macos'
@@ -117,21 +100,17 @@ module Planara
     end
 
     def notify_user(current, latest, url)
-      # UI.messagebox must be called on SketchUp's main thread.
-      # Thread.new fires this in a background thread, so we use
-      # UI.start_timer with 0 delay to marshal back.
-      ::UI.start_timer(0, false) do
-        result = ::UI.messagebox(
-          "A new version of Planara is available!\n\n" \
-          "Current: v#{current}\n" \
-          "Latest:  v#{latest}\n\n" \
-          "Would you like to open the download page?",
-          MB_YESNO
-        )
+      # We are already on the main thread thanks to Sketchup::Http::Request callback.
+      result = ::UI.messagebox(
+        "A new version of Planara is available!\n\n" \
+        "Current: v#{current}\n" \
+        "Latest:  v#{latest}\n\n" \
+        "Would you like to open the download page?",
+        MB_YESNO
+      )
 
-        if result == IDYES
-          ::UI.openURL(url)
-        end
+      if result == IDYES
+        ::UI.openURL(url)
       end
     end
   end
