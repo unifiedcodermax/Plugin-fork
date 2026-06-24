@@ -49,7 +49,9 @@ def evaluate(snapshot: Snapshot) -> ValidationResponse:
         # Always merge computed into metrics so the plugin can render
         # values even for rules that PASSED (the user wants to see
         # their actual FSI, not just whether it's over the limit).
-        metrics.update(result.computed)
+        # Skip info-severity rules as they often contain dummy limits (like max_fsi 999.0)
+        if rule.severity != Severity.info:
+            metrics.update(result.computed)
 
         if result.passed:
             continue
