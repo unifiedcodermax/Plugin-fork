@@ -236,10 +236,13 @@ module Planara
         overlays: snapshot[:project][:overlays]
       )
 
+      used_fallback = snapshot[:building][:_used_fallback_floors]
+
       if noisy
         # User-triggered actions (menu clicks) stay synchronous so
         # dialogs and error messages appear in the expected order.
         response = EngineClient.validate(snapshot)
+        inject_fallback_warning(response, snapshot) if used_fallback
         show_validation_result(response)
       else
         # Live-loop: use Sketchup::Http::Request for non-blocking
@@ -250,6 +253,7 @@ module Planara
             Logger.warn('validate_failed', code: error.code, message: error.message, noisy: false)
             UI::ResultsDialog.update_error(error_type: 'engine', message: error.message)
           else
+            inject_fallback_warning(response, snapshot) if used_fallback
             show_validation_result(response)
           end
         end
@@ -267,6 +271,17 @@ module Planara
       ::UI.messagebox("Validation failed: #{e.message}") if noisy
     ensure
       @_validating = false
+    end
+
+    def inject_fallback_warning(response, snapshot)
+      response['violations'] ||= []
+      floor_count = snapshot[:building][:floors].length
+      response['violations'] << {
+        'rule_id' => 'blr.floor_detection.info',
+        'category' => 'info',
+        'severity' => 'info',
+        'message' => "Automatic floor detection was used. For best compliance accuracy, explicitly name storeys 'Floor 0', 'Floor 1', 'Floor 2', etc. Detected floors: #{floor_count}. Detection method: Fallback."
+      }
     end
 
     # Live-loop lifecycle -------------------------------------------------
