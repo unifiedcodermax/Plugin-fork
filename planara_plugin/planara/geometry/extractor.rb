@@ -59,8 +59,12 @@ module Planara
         plot = find_plot(model) || find_plot_fallback(model)
         raise ExtractionError, 'no plot found — name a group "Plot" or draw a closed ground-level polygon inside a group' unless plot
 
+        used_fallback_floors = false
         floors = find_floors(model)
-        floors = find_floors_fallback(model, plot) if floors.empty?
+        if floors.empty?
+          floors = find_floors_fallback(model, plot)
+          used_fallback_floors = true
+        end
         raise ExtractionError, 'no floors found — name groups "Floor 0", "Floor 1", … or create groups with horizontal faces above the plot' if floors.empty?
 
         plot_polygon = polygon_from(plot)
@@ -103,7 +107,8 @@ module Planara
           parking_slots: parking_slots,
           has_lift: has_lift,
           declared_floors: declared_floors,
-          total_height_m: total_height_m
+          total_height_m: total_height_m,
+          used_fallback_floors: used_fallback_floors
         )
       end
 
@@ -111,7 +116,7 @@ module Planara
       # `extract` so it can be exercised by `test/test_extractor.rb`
       # outside the SketchUp host. The shape pinned here IS the
       # Ruby↔Python wire contract.
-      def build_payload(plot_polygon:, floor_payloads:, project:, parking_slots: 0, has_lift: false, declared_floors: nil, total_height_m: nil)
+      def build_payload(plot_polygon:, floor_payloads:, project:, parking_slots: 0, has_lift: false, declared_floors: nil, total_height_m: nil, used_fallback_floors: false)
         {
           schema_version: SCHEMA_VERSION,
           snapshot_id: SecureRandom.uuid,
@@ -127,6 +132,7 @@ module Planara
           }.tap do |b|
             b[:declared_floors] = declared_floors if declared_floors
             b[:total_height_m] = total_height_m if total_height_m
+            b[:_used_fallback_floors] = true if used_fallback_floors
           end,
         }
       end
@@ -202,29 +208,120 @@ module Planara
         best
       end
 
+      MIN_FLOOR_AREA_M2 = 6.0
+      ELEVATION_TOLERANCE_M = 1.5
+
       # Discover floor-like groups by looking for top-level
       # groups/components (excluding the plot) that contain at
       # least one horizontal face.  Sort by bounding-box min-Z
       # and assign levels 0, 1, 2, …  Auto-renames each.
       def find_floors_fallback(model, plot_entity)
-        candidates = top_level_groups(model).reject { |e| e == plot_entity }
+        plot_poly = polygon_from(plot_entity)
+        plot_area = plot_poly ? plot_poly[:area_m2] : 0.0
+        min_area = [MIN_FLOOR_AREA_M2, plot_area * 0.01].max
 
-        # Keep only groups that contain at least one horizontal face
-        with_faces = candidates.select do |entity|
-          inner_entities(entity).grep(Sketchup::Face).any? { |f| horizontal?(f) }
+        candidates = top_level_groups(model).reject { |e| e == plot_entity }
+        
+        valid_candidates = []
+        candidates.each do |entity|
+          faces = inner_entities(entity).grep(Sketchup::Face)
+          horiz = faces.select { |f| f.valid? && horizontal?(f) }
+          
+          if horiz.empty?
+            Logger.info('floor_fallback_reject', entity: entity_name(entity), reason: 'no_horizontal_face')
+            next
+          end
+
+          max_face_area = horiz.map { |f| Units.square_inches_to_square_meters(f.area) }.max
+          if max_face_area < min_area
+            Logger.info('floor_fallback_reject', entity: entity_name(entity), reason: 'area_below_threshold', area_m2: max_face_area.round(2))
+            next
+          end
+
+          bb = entity.bounds
+          bb_height = Units.inches_to_meters(bb.max.z - bb.min.z)
+          if bb_height < 1.5
+            Logger.warn('floor_fallback_reject', entity: entity_name(entity), reason: 'height_too_small', height_m: bb_height.round(3))
+            next
+          end
+
+          valid_candidates << {
+            entity: entity,
+            area_m2: max_face_area,
+            z_m: Units.inches_to_meters(bb.min.z),
+            top_z_m: Units.inches_to_meters(bb.max.z)
+          }
         end
 
-        return [] if with_faces.empty?
+        return [] if valid_candidates.empty?
 
-        # Sort by the bottom of their bounding box (lowest Z first)
-        sorted = with_faces.sort_by { |e| e.bounds.min.z }
+        # Identify largest candidate for the 40% rule (logging only)
+        largest_area = valid_candidates.map { |c| c[:area_m2] }.max
+        threshold_40 = largest_area * 0.4
+        valid_candidates.each do |c|
+          if c[:area_m2] < threshold_40
+            Logger.info('floor_fallback_small_area', entity: entity_name(c[:entity]), area_m2: c[:area_m2].round(2), threshold: threshold_40.round(2))
+          end
+        end
+
+        # Elevation clustering
+        valid_candidates.sort_by! { |c| c[:z_m] }
+        clusters = []
+        current_cluster = [valid_candidates.first]
+
+        valid_candidates[1..-1].each do |c|
+          if (c[:z_m] - current_cluster.first[:z_m]).abs <= ELEVATION_TOLERANCE_M
+            current_cluster << c
+          else
+            clusters << current_cluster
+            current_cluster = [c]
+          end
+        end
+        clusters << current_cluster unless current_cluster.empty?
+
+        # Select largest area candidate per cluster
+        selected = clusters.map do |cluster|
+          cluster.max_by { |c| c[:area_m2] }
+        end
+
+        # Building height and floor cap
+        min_z_m = selected.first[:z_m]
+        max_top_z_m = selected.map { |c| c[:top_z_m] }.max
+        building_height_m = max_top_z_m - min_z_m
+        
+        max_reasonable = [(building_height_m / 2.4).ceil, 1].max
+
+        # Sort selected candidates by Z
+        selected.sort_by! { |c| c[:z_m] }
+
+        if selected.length > max_reasonable
+          rejected = selected[max_reasonable..-1]
+          rejected.each do |c|
+            Logger.info('floor_fallback_reject', entity: entity_name(c[:entity]), reason: 'exceeds_max_floor_count')
+          end
+          selected = selected.first(max_reasonable)
+        end
+
+        if selected.length > 0
+          avg_height = building_height_m / selected.length
+          if avg_height < 2.0
+            Logger.warn(
+              'floor_detection_suspicious',
+              floors: selected.length,
+              building_height_m: building_height_m.round(2),
+              avg_floor_height_m: avg_height.round(2)
+            )
+          end
+        end
 
         floors = []
-        sorted.each_with_index do |entity, idx|
+        selected.each_with_index do |c, idx|
+          entity = c[:entity]
           auto_rename(model, entity, "Floor #{idx}")
-          Logger.info('auto_detect_floor', level: idx, entity_id: entity.persistent_id)
+          Logger.info('floor_fallback_accept', level: idx, entity_id: entity.persistent_id, name: entity_name(entity), area_m2: c[:area_m2].round(2))
           floors << [idx, entity]
         end
+
         floors
       end
 
